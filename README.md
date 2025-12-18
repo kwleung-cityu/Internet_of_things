@@ -33,7 +33,7 @@ Once the sensor has data, the "Thing" needs a way to "speak" to the internet. We
 *   **Wi-Fi:** This is the most popular method for home and office projects. It's easy and wireless.
     * **Examples:** An ESP32 has Wi-Fi built-in. An Arduino (like MEGA 2560) can use an external Wi-Fi module (ESP8266).
 
-      <img src = "./docs/images/esp32_wifi.png">
+      <img src = "./docs/images/esp32_wifi.jpg">
     
 *   **Ethernet (Wired LAN):** If a physical network cable is available, this is often the most reliable and stable option. It's great for stationary devices where a wired connection is not a problem.
     
