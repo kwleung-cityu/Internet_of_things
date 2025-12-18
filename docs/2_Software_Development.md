@@ -5,7 +5,7 @@ A complete IoT system has many parts that need to work together. Instead of writ
 
 Our first step is to get a reliable reading from the moisture sensor.
 
-**Part 1: Calibrating the Moisture Sensor **
+**Part 1: Calibrating the Moisture Sensor**
 
 The analog output of the moisture sensor gives us a raw number, not a percentage. This raw value can vary between different sensors and depends on the voltage supplied. To get a meaningful moisture percentage (0% to 100%), we first need to calibrate our specific sensor.
 
