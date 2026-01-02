@@ -4,8 +4,6 @@
 
 Before we begin, let's quickly define the "Cloud." In technology, the "cloud" refers to on-demand access to shared computing resources—like servers, storage, and software—delivered over the internet. For our project, ThingSpeak is a cloud service that will act as the "brain," allowing us to store, view, and react to our sensor data from anywhere in the world.
 
-
-
 ## Step 1: Create Your ThingSpeak Account and Channel
 
   First, we need to set up a destination for our data.
@@ -72,24 +70,24 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
 
 * **React** app of ThingSpeak - This is the **"Trigger."** Its job is to constantly watch your channel's data - "WHEN `Soil Moisture (%)` of my channel becomes `less than 20`, call ThingHTTP app"
 
-  #### **Step 4A: Configure CallMeBot**
+  #### **Step 4A: Configure [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/)**
 
   1. Add the phone number **+34 694 23 67 31** into your Phone Contacts. (Name it WhatsApp Bot, say )
 
   2. Send this message "**I allow CallMeBot to send me messages**" to the new Contact created using WhatsApp
 
-  3. You will receive the message "**CallMeBot API Activated for [your_phone_number]**". Your apikey is: **[your_Apikey]**.
+  3. You will receive the message "**CallMeBot API Activated for [your_phone_number]**". Your apikey is: **[your_Apikey]** - this is the CallMeBot apikey, **NOT** the ThingSpeak write apikey you copied earlier.
 
-     **Note:** This is the CallMeBot apikey, **NOT** the ThingSpeak write apikey you copied earlier. You will get several API keys for this demo.
-     
      <img src = "./images/callmebot_activated.png">
      
   4. You can now send a message using REST API calls to test it . Construct the following URL in a text editor and paste the complete URL `https://api.callmebot.com/whatsapp.php?phone=[your_phone_number]&text=This+is+a+test&apikey=[your_CallMeBot_apikey]` into your web browser's address bar and press Enter.
-
+  
      **Example:**
 
      <img src = "./images/callmebot_rest_message.png">
 
+     Within a few seconds, you will receive a WhatsApp message with the text message you entered in the URL.
+     
      <img src = "./images/callmebot_this_is_a_test.png">
 
   #### **Step 4B: Configure the `ThingHTTP` Action**
@@ -105,7 +103,7 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
   3. Fill out the form with the following details:
 
      - **Name:** `Send WhatsApp Alert`
-
+  
      - **URL:** This is the most important part. You need to construct the entire API request URL here, including your phone number, the message, and your API key. Replace the placeholders `[]` with your actual values.
        
        ```
@@ -149,7 +147,7 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
      - **Test Frequency:** Select `On data insertion`. This ensures the condition is checked every time your device sends new data.
      - **Condition:** Configure it as follows:
        - `If channel [Your Channel ID] field [1] is less than [20]`
-       - This tells the React to trigger when the value in **Field 1 (Soil Moisture %)** drops below **20**.
+       - This tells the React to trigger when the value in **Field 1 (Soil Moisture %)** drops below **20%**.
      - **Action:** Select `ThingHTTP` from the dropdown menu.
      - **ThingHTTP to execute:** A new dropdown will appear. Select the **`Send WhatsApp Alert`** action you created earlier.
      - **Options:** Select `Run action only the first time the condition is met`. This prevents you from receiving repeated alerts every time a new data point below the threshold is inserted. The alert will reset and can be triggered again once a value above the threshold is received.
@@ -178,7 +176,7 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
   
   <img src = "./images/react_thingHTTP_callmebot_test1.1.png">
   
-  Within a minute or two, you should receive a WhatsApp message on your phone that says: "Warning: Your plant is thirsty!"
+  Within a few seconds, you should receive a WhatsApp message on your phone that says: "Warning: Your plant is thirsty!"
   
   <img src = "./images/react_thingHTTP_callmebot_test2.png">
   

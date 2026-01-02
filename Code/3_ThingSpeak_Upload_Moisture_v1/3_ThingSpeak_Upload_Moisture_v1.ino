@@ -1,8 +1,10 @@
-// File: 3_ThingSpeak_Upload_Moisture
+// File: 3_ThingSpeak_Upload_Moisture_v1.ino
+// This is the blocking version with a delay of 60 seconds in the main loop.
 
 #include "ThingSpeak.h"
 #include "WiFiEsp.h"
 
+#define SERIAL_MON_BAUDRATE 115200
 #define ESP_BAUDRATE  115200
 char ssid[] = "YOUR_SSID";        // your network SSID (name) 
 char pass[] = "YOUR_PASSWORD";    // your network password
@@ -23,7 +25,9 @@ const int WET_VALUE = 250;
 // ========================================
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_MON_BAUDRATE);
+  Serial1.begin(ESP_BAUDRATE);       // Initialize Serial1 for ESP8266 modem
+
   delay(500); //a short delay to let Serial port settle
 
   WiFi.init(&Serial1);  //using Serial1 for ESP8266 modem
@@ -71,7 +75,6 @@ void loop() {
   ThingSpeak.setField(moistureFieldNumber, moisturePercent);
 
   while(!upload_success_flag){
-    //int writeField(unsigned long channelNumber, unsigned int field, int value, const char * writeAPIKey)
     int status_code = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
     if(status_code == 200){
       Serial.println("Data upload successfully.");
