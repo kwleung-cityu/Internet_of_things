@@ -21,7 +21,6 @@ Before we begin, let's quickly define the "Cloud." In technology, the "cloud" re
      - **Name:** `Smart Flowerpot` (or any name you like)
      - **Description:** `Monitors soil moisture and controls a water pump.`
      - **Field 1:** Check the box to enable it and name it `Soil Moisture (%)`.
-     - **Field 2:** Check the box to enable it and name it `Alarm Status`.
      - Scroll down and click **"Save Channel."**
 
      <img src = "./images/channel_setup.png">
@@ -71,7 +70,7 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
 
 * **ThingHTTP** app of ThingSpeak - This is the **"Action."** Its job is to make an HTTP request to CallMeBot to make an instant notification to a registered phone number
 
-* **React** app of ThingSpeak - This is the **"Trigger."** Its job is to constantly watch your channel's data - "WHEN Field 2 of my channel becomes `equal to 1`, call ThingHTTP app"
+* **React** app of ThingSpeak - This is the **"Trigger."** Its job is to constantly watch your channel's data - "WHEN `Soil Moisture (%)` of my channel becomes `less than 20`, call ThingHTTP app"
 
   #### **Step 4A: Configure CallMeBot**
 
@@ -81,11 +80,11 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
 
   3. You will receive the message "**CallMeBot API Activated for [your_phone_number]**". Your apikey is: **[your_Apikey]**.
 
-     Note: If you don't receive the ApiKey in 2 minutes, please try again after 24hs.
+     **Note:** This is the CallMeBot apikey, **NOT** the ThingSpeak write apikey you copied earlier. You will get several API keys for this demo.
      
      <img src = "./images/callmebot_activated.png">
      
-  4. You can now send a message using REST API calls to test it . Construct the following URL in a text editor and paste the complete URL `https://api.callmebot.com/whatsapp.php?phone=[your_phone_number]&text=This+is+a+test&apikey=[your_apikey]` into your web browser's address bar and press Enter.
+  4. You can now send a message using REST API calls to test it . Construct the following URL in a text editor and paste the complete URL `https://api.callmebot.com/whatsapp.php?phone=[your_phone_number]&text=This+is+a+test&apikey=[your_CallMeBot_apikey]` into your web browser's address bar and press Enter.
 
      **Example:**
 
@@ -112,7 +111,7 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
        ```
        https://api.callmebot.com/whatsapp.php?phone=[Your_Phone_Number]&text=Warning:+Your+plant+is+thirsty!&apikey=[Your_CallMeBot_API_Key]
        ```
-       **Important:** Notice the `+` signs in the `text` parameter. In a URL, you cannot have spaces. The `+` character is used to represent a space.
+       **Important:** In this demo, we are going to send a text message - *Warning: Your plant is thirsty* to your smartphone by WhatsApp. Notice the `+` signs in the `text` parameter. In a URL, you cannot have spaces. The `+` character is used to represent a space.
        
      - **Method:** `GET`
 
@@ -132,11 +131,11 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
 
      <img src = "./images/ThingHTTP_Url_Test_result.png">
   
-  Receiving the correct WhatsApp alert confirms that your ThingHTTP-to-CallMeBot integration is configured properly.
+  Receiving the correct WhatsApp alert confirms that your ThingHTTP-to-CallMeBot action chain is configured properly.
 
   #### **Step 4C: Configure the `React` Trigger**
 
-  The last step is to set the trigger *when* to perform the action (ThingHTTP-to-CallMeBot) you just created.
+  The final step is to create the trigger that automatically initiates the alert. The `React` app will monitor the `Soil Moisture (%)` field and execute the `ThingHTTP` action when the moisture level drops below a specific threshold, in our case 20%.
 
   1. Go to the **"Apps"** menu and select **"React."**
 
@@ -144,28 +143,30 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
 
      <img src = "./images/react_config_1.png">
   
-  3. Fill out the form:
-     - **Name:** `Low Moisture React`
+  3. Fill out the form with the following details:
+     - **Name:** `Low Moisture Alert`
      - **Condition Type:** `Numeric`
-     - **Test Frequency:** Select `On data insertion`.
-     - **Condition:** `If channel [Your Channel ID] field [2] is equal to [1]`
+     - **Test Frequency:** Select `On data insertion`. This ensures the condition is checked every time your device sends new data.
+     - **Condition:** Configure it as follows:
+       - `If channel [Your Channel ID] field [1] is less than [20]`
+       - This tells the React to trigger when the value in **Field 1 (Soil Moisture %)** drops below **20**.
      - **Action:** Select `ThingHTTP` from the dropdown menu.
-     - **ThingHTTP to execute:** A new dropdown will appear. Select the **`Send WhatsApp Alert`** ThingHTTP you created in the previous step.
-     - Set **Options** to `Run action only the first time the condition is met`.
+     - **ThingHTTP to execute:** A new dropdown will appear. Select the **`Send WhatsApp Alert`** action you created earlier.
+     - **Options:** Select `Run action only the first time the condition is met`. This prevents you from receiving repeated alerts every time a new data point below the threshold is inserted. The alert will reset and can be triggered again once a value above the threshold is received.
      
   4. Click **"Save React."**
 
      <img src = "./images/react_config_2.png">
-
+  
   #### **Step 4D: Test the Full Alert System**
   
   With all the cloud components configured, it's time for the final test. We will now manually trigger the `React` condition to ensure the entire alert chain works as expected. This process simulates what your Arduino will do automatically when it detects low moisture.
   
-  1. **Construct the Test URL:** In a text editor, create the following URL.
+  1. **Construct the Test URL:** In a text editor, create the following URL. This will send a value of `19` to `field1`, which is below our threshold of `20` and should trigger the alert.
   
-     `https://api.thingspeak.com/update?api_key=YOUR_API_KEY&field2=1`
+     `https://api.thingspeak.com/update?api_key=YOUR_WRITE_API_KEY&field1=19`
   
-     Remember to replace `YOUR_API_KEY` with your channel's **Write API Key**. This URL will send the value `1` to `field2`, which is the condition our `React` app is waiting for.
+     Remember to replace `YOUR_WRITE_API_KEY` with your channel's **Write API Key**.
   
   2. **Trigger the Alert:** Paste the complete URL into your web browser's address bar and press Enter.
   
@@ -173,13 +174,29 @@ Now, let's make ThingSpeak send an alert when the plant is thirsty. We need to u
   
   **Expected Result:**
   
+  Your channel will be updated with the new moisture value you manually set with `field1=19`.
+  
+  <img src = "./images/react_thingHTTP_callmebot_test1.1.png">
+  
   Within a minute or two, you should receive a WhatsApp message on your phone that says: "Warning: Your plant is thirsty!"
   
   <img src = "./images/react_thingHTTP_callmebot_test2.png">
   
   Receiving this message confirms that your entire cloud setup is working perfectly!
 
-#### Step 5: Sending Messages to WhatsApp - Arduino Code
+---
 
-Reference: https://randomnerdtutorials.com/esp32-send-messages-whatsapp/
+## Conclusion: Your Cloud Platform is Ready!
 
+Congratulations! You have successfully configured a complete, end-to-end cloud monitoring and alert system.
+
+- You created a **ThingSpeak channel** to store and visualize your sensor data.
+- You learned how to use **API keys** to securely communicate with the service.
+- You configured a **ThingHTTP** action to connect ThingSpeak to an external notification service (CallMeBot).
+- You set up a **React** to automatically trigger that action based on your data.
+
+Your cloud platform is now fully prepared. It is waiting to receive data from your physical device and will automatically send an alert to your phone when your plant needs water.
+
+The final piece of the puzzle is to program your Arduino to read the moisture sensor and send the data to ThingSpeak.
+
+**Next Step:** Proceed to [Part 3: Uploading Data to the Cloud](../docs/2_Software_Development.md#part-3-uploading-moisture-data-to-thingspeak) to begin writing the device code.

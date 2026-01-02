@@ -133,11 +133,20 @@ Raw: 510  ->  Moisture: 39%
 Raw: 300  ->  Moisture: 88%
 ```
 
-With this reliable percentage reading, we are now ready to connect our project to the internet in the next step.
+With this reliable percentage reading, we are now ready to connect our project to the internet and complete the feedback loop.
 
 ---
 
 **Part 3: Uploading moisture data to ThingSpeak**
+
+Now that we can accurately measure soil moisture, the next step is to send this data to the ThingSpeak channel we configured. This will involve writing Arduino code that connects to your Wi-Fi and sends HTTP requests containing the sensor data.
+
+**The Goal:** Upload the soil moisture as a percentage to our ThingSpeak channel that we created in [**Part 3: Cloud Configuration**](../docs/3_Cloud_Configuration.md) and trigger to send a WhatsApp message to your smartphone when the percentage is less than a predefined threshold value.
+
+Prerequisite:
+
+
+
 
 **Part 4: Simple algorithm to react on abnormality** 
 

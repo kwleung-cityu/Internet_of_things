@@ -39,13 +39,13 @@ Once the sensor has data, the "Thing" needs a way to "speak" to the internet. We
     
     * **Example:** An Arduino with an Ethernet Shield.
     
-      <img src = "./docs/images/ethernet_shield.jpg" width=40%>
+      <img src = "./docs/images/ethernet_shield.jpg">
     
 *   **Cellular (GSM/3G/4G):** This is perfect for mobile projects or devices in remote locations without Wi-Fi or LAN access. It uses the same technology as your smartphone to connect from almost anywhere.
     
     * **Example:** An Arduino or ESP32 connected to a GSM/GPRS module (like a SIM800L or SIM7600).
     
-      <img src = "./docs/images/GSM_modem.jpg" width=40%>
+      <img src = "./docs/images/GSM_modem.jpg">
 
 No matter which method you choose, this device's job is to read the sensor and **send the data out to the cloud**. This is the "Internet" part of IoT.
 
@@ -65,7 +65,7 @@ In this demonstration, you will build a system that can:
 
 **Part 1: Monitor**
 
-Read moisture data from a sensor and send it to a ThingSpeak channel in the cloud every 10 seconds.
+Read moisture data from a sensor and send it to a ThingSpeak channel in the cloud every 60 seconds.
 
 **Part 2: Alert**
 
