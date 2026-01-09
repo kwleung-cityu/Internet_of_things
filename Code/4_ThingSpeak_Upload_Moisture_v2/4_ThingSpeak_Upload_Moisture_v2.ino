@@ -34,6 +34,10 @@
 #define SENSOR_PIN A0 
 #define PUMP_RELAY_PIN 2
 
+// --- enable/disable ThingSpeak at compile time ---
+// uncomment to enable ThingSpeak uploads  
+// #define THINGSPEAK_ENABLE
+
 // --- Sensor Calibration ---
 // Replace these with the values you found in the calibration step
 const int DRY_VALUE = 680; // Raw ADC value for 0% moisture (in air)
@@ -52,36 +56,58 @@ const unsigned int moistureFieldNumber = 1;          // Field number for moistur
 // --- Global Variables ---
 WiFiEspClient thingspeakClient;
 int currentMoisturePercent = 0; // Holds the latest sensor reading
+bool manualMoistureOverride = false; // NEW: Flag to enable manual override
+
+// --- Pump Control ---
+const int moistureThreshold = 20;     // Turn pump on if moisture is below this %
+const int maxPumpOnTime = 5000;       // Max pump on-time in ms (for 0% moisture)
+const int minPumpOnTime = 1000;       // Min pump on-time in ms (for just below threshold)
+bool pumpIsOn = false;                // Tracks the pump's current state
+unsigned long pumpStartTime = 0;      // Tracks when the pump was turned on
+unsigned long pumpOnTimeMillis = 0;   // Holds the calculated pump on-time
 
 // --- Timing Control (Non-Blocking) ---
 // Used to track time for various tasks without using delay()
 unsigned long previousSensorReadMillis = 0;
 unsigned long previousThingSpeakUploadMillis = 0;
+unsigned long previousWaterPumpCheckMillis = 0;
+unsigned long previousWifiConnectMillis = 0;
 
 // Set the intervals for how often tasks should run (in milliseconds)
 const long sensorReadInterval = 5000;       // Read sensor every 5 seconds
 const long thingSpeakUploadInterval = 60000; // Upload to ThingSpeak every 60 seconds
+const long waterPumpCheckInterval = 500;   // Check water pump control every 0.5 second
+const long wifiConnectInterval = 10000;     // Attempt to reconnect to Wi-Fi every 10 seconds
 
 // --- Function Prototypes ---
 void connectWiFi();
 void readMoisture();
 void uploadToThingSpeak();
 void controlWaterPump();
+void handleSerialInput(); // NEW: Function to handle serial commands
 
 // ==============================================================================
 // SETUP: Runs once when the Arduino starts up
 // ==============================================================================
 void setup() {
 
-  Serial.begin(115200);
+  Serial.begin(SERIAL_MON_BAUDRATE);
+  delay(500); // Give some time for Serial to initialize
+
+#if defined(THINGSPEAK_ENABLE)
   Serial1.begin(ESP_BAUDRATE); // Initialize Serial1 for ESP8266 modem
+  connectWiFi(); // Initial attempt to connect to Wi-Fi
+  ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
+#endif
 
   pinMode(PUMP_RELAY_PIN, OUTPUT);
   digitalWrite(PUMP_RELAY_PIN, LOW); // Ensure pump is OFF by default
 
-  connectWiFi(); // Initial attempt to connect to Wi-Fi
-
-  ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
+  // NEW: Instructions for manual override
+  Serial.println("\n--- System Ready ---");
+  Serial.println("Enter a number (0-100) to manually set moisture %.");
+  Serial.println("Enter 'auto' to return to sensor-based reading.");
+  Serial.println("--------------------");
 }
 
 // ==============================================================================
@@ -91,11 +117,8 @@ void loop() {
   // Get the current time at the start of the loop
   unsigned long currentMillis = millis();
 
-  // Task 1: Maintain Wi-Fi Connection (runs on every loop)
-  // If Wi-Fi disconnects, this will attempt to reconnect.
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
-  }
+  // NEW: Task 1: Check for serial input to update settings
+  handleSerialInput();
 
   // Task 2: Read the moisture sensor at its specified interval
   if (currentMillis - previousSensorReadMillis >= sensorReadInterval) {
@@ -103,15 +126,22 @@ void loop() {
     readMoisture();
   }
 
-  // Task 3: Upload data to ThingSpeak at its specified interval
+  // Task 3: Upload data to ThingSpeak at its specified interval 
+  #if defined(THINGSPEAK_ENABLE)
   if (currentMillis - previousThingSpeakUploadMillis >= thingSpeakUploadInterval) {
     previousThingSpeakUploadMillis = currentMillis; // Save the time of this upload
+    if (WiFi.status() != WL_CONNECTED) {
+      connectWiFi();
+    }
     uploadToThingSpeak();
   }
+  #endif
 
   // Task 4: Control the water pump (runs on every loop)
-  // This function will contain the logic to turn the pump on/off based on moisture
-  controlWaterPump();
+  if (currentMillis - previousWaterPumpCheckMillis >= waterPumpCheckInterval) {
+    previousWaterPumpCheckMillis = currentMillis; // Save the time of this check
+    controlWaterPump();
+  }
 }
 
 // ==============================================================================
@@ -145,21 +175,21 @@ void connectWiFi() {
 
 /**
  * @brief Reads the moisture sensor and updates the global variable.
+ * MODIFIED: Skips reading if manual override is active.
  */
 void readMoisture() {
-  int rawValue = analogRead(SENSOR_PIN);
-  
-  // Map the raw value to a percentage
-  currentMoisturePercent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
-  
-  // Constrain the value to the 0-100 range to prevent invalid readings
-  currentMoisturePercent = constrain(currentMoisturePercent, 0, 100);
+  // Only read from the sensor if we are in automatic mode
+  if (!manualMoistureOverride) {
+    int rawValue = analogRead(SENSOR_PIN);
+    currentMoisturePercent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
+    currentMoisturePercent = constrain(currentMoisturePercent, 0, 100);
 
-  Serial.print("Sensor Reading -> Raw: ");
-  Serial.print(rawValue);
-  Serial.print(", Moisture: ");
-  Serial.print(currentMoisturePercent);
-  Serial.println("%");
+    Serial.print("Sensor Reading -> Raw: ");
+    Serial.print(rawValue);
+    Serial.print(", Moisture: ");
+    Serial.print(currentMoisturePercent);
+    Serial.println("% (Auto)");
+  }
 }
 
 /**
@@ -180,21 +210,58 @@ void uploadToThingSpeak() {
     Serial.println("ThingSpeak upload successful.");
   } else {
     Serial.println("Problem uploading to ThingSpeak. HTTP error code " + String(httpCode));
-    // Note: No delay() or while() loop here. If it fails, it will simply
-    // try again on the next scheduled interval.
   }
 }
 
 /**
- * @brief Placeholder function for water pump control logic.
- * This function can now be called on every loop without being blocked.
+ * @brief Controls the water pump with dynamic duration based on moisture level.
+ * This function is non-blocking.
  */
 void controlWaterPump() {
-  // This is where you would add the logic to control the pump.
-  // For example:
-  // if (currentMoisturePercent < 30) {
-  //   digitalWrite(PUMP_RELAY_PIN, HIGH); // Turn pump ON
-  // } else {
-  //   digitalWrite(PUMP_RELAY_PIN, LOW);  // Turn pump OFF
-  // }
+  unsigned long currentMillis = millis();
+
+  if (!pumpIsOn && currentMoisturePercent < moistureThreshold) {
+    pumpOnTimeMillis = map(currentMoisturePercent, 0, moistureThreshold, maxPumpOnTime, minPumpOnTime);
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    pumpIsOn = true;
+    pumpStartTime = currentMillis;
+
+    Serial.print("Soil is dry. Turning pump ON for ");
+    Serial.print(pumpOnTimeMillis);
+    Serial.println(" ms.");
+  }
+
+  if (pumpIsOn && (currentMillis - pumpStartTime >= pumpOnTimeMillis)) {
+    digitalWrite(PUMP_RELAY_PIN, LOW);
+    pumpIsOn = false;
+    Serial.println("Pump OFF. Watering cycle complete.");
+  }
+}
+
+/**
+ * @brief NEW: Handles incoming serial data to update settings.
+ * This function is non-blocking.
+ */
+void handleSerialInput() {
+  if (Serial.available() > 0) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+
+    if (input.equalsIgnoreCase("auto")) {
+      manualMoistureOverride = false;
+      Serial.println("Switched to AUTOMATIC mode. Using soil sensor.");
+    } else {
+      int manualValue = input.toInt();
+      // Check if the input is a valid number and within range
+      if (manualValue >= 0 && manualValue <= 100) {
+        manualMoistureOverride = true;
+        currentMoisturePercent = manualValue;
+        Serial.print("MANUAL OVERRIDE: Moisture set to ");
+        Serial.print(currentMoisturePercent);
+        Serial.println("%.");
+      } else {
+        Serial.println("Invalid input. Enter a number 0-100 or 'auto'.");
+      }
+    }
+  }
 }

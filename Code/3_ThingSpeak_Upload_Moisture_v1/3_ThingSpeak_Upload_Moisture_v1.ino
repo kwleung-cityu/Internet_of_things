@@ -6,6 +6,7 @@
 
 #define SERIAL_MON_BAUDRATE 115200
 #define ESP_BAUDRATE  115200
+
 char ssid[] = "YOUR_SSID";        // your network SSID (name) 
 char pass[] = "YOUR_PASSWORD";    // your network password
 

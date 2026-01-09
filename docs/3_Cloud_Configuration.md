@@ -197,4 +197,4 @@ Your cloud platform is now fully prepared. It is waiting to receive data from yo
 
 The final piece of the puzzle is to program your Arduino to read the moisture sensor and send the data to ThingSpeak.
 
-**Next Step:** Proceed to [Part 3: Uploading Data to the Cloud](../docs/2_Software_Development.md#part-3-uploading-moisture-data-to-thingspeak) to begin writing the device code.
+**Next Step:** Proceed to [2_Software_development](../docs/2_Software_Development.md) to begin writing the device code.

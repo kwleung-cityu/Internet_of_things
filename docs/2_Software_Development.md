@@ -5,7 +5,7 @@ A complete IoT system has many parts that need to work together. Instead of writ
 
 Our first step is to get a reliable reading from the moisture sensor.
 
-**Part 1: Calibrating the Moisture Sensor**
+## Part 1: Calibrating the Moisture Sensor
 
 The analog output of the moisture sensor gives us a raw number, not a percentage. This raw value can vary between different sensors and depends on the voltage supplied. To get a meaningful moisture percentage (0% to 100%), we first need to calibrate our specific sensor.
 
@@ -62,7 +62,7 @@ Your values will be slightly different, but they should look something like this
 
 ---
 
-**Part 2: Converting Raw Values to a Percentage**
+## Part 2: Converting Raw Values to a Percentage
 
 Now that we have our unique calibration values, we can write a new program to convert the sensor's raw output into an intuitive 0% to 100% moisture scale. For this, we will use the incredibly useful `map()` function in Arduino.
 
@@ -115,7 +115,7 @@ void loop() {
 **2. How the Code Works**
 
 - **`DRY_VALUE` and `WET_VALUE`:** We store our calibration numbers in constant variables at the top of the code. This makes them easy to find and change.
-- **`map(rawValue, DRY_VALUE, WET_VALUE, 0, 100)`:** This is the core of our conversion. It tells the Arduino: "Take the `rawValue`. If it's equal to `DRY_VALUE` (680), the result is 0. If it's equal to `WET_VALUE` (250), the result is 100. For any value in between, calculate the proportional percentage." The function is smart enough to handle the fact that our "from" range is inverted (from a high number to a low one).
+- **`map(rawValue, DRY_VALUE, WET_VALUE, 0, 100)`:** This is the core of our conversion. It tells the Arduino: "Take the `rawValue`. If it's equal to `DRY_VALUE` (680), the result is 0%. If it's equal to `WET_VALUE` (250), the result is 100%. For any value in between, calculate the proportional percentage." The function is smart enough to handle the fact that our "from" range is inverted (from a high number to a low one).
 - **`constrain(moisturePercent, 0, 100)`:** This is a safety function. It ensures that our final `moisturePercent` value will never be displayed as less than 0 or greater than 100, even if there's a strange spike in the sensor reading.
 
 **3. Testing the Program**
@@ -137,7 +137,7 @@ With this reliable percentage reading, we are now ready to connect our project t
 
 ---
 
-**Part 3A: Uploading moisture data to ThingSpeak**
+## Part 3A: Uploading moisture data to ThingSpeak
 
 Now that we can accurately measure soil moisture, the next step is to send this data to the ThingSpeak channel we configured. This will involve writing Arduino code that connects to your Wi-Fi and sends HTTP requests containing the sensor data.
 
@@ -220,7 +220,19 @@ void loop() {
 
 <img src = "./images/Thingspeak_upload_v1_serialmon.png">
 
+<img src = "./images/1767932416225.jpg">
+
+<img src= "./images/1767932427613.jpg">
+
+To send the soil moisture data to the cloud, the code calls the `ThingSpeak.writeFields()` function. ThingSpeak then automatically adds a timestamp to each new reading as it arrives, which allows us to track the moisture levels over time.
+
+We can test the alert system by simulating a "dry soil" event (0% moisture) by simply taking the sensor out of the water. This low value triggers a 'React' app within ThingSpeak, which is configured to use the ThingHTTP service (see [3_Cloud_Configuration.md](3_Cloud_Configuration.md) for setup details). 
+
 <img src = "./images/Thingspeak_upload_v1_on_field1.png">
+
+ThingHTTP then sends a REST API request to CallMeBot, an external service that sends a notification to my phone via WhatsApp, as shown in the screenshot below.
+
+<img src = "./images/callmebot_message_1.jpg">
 
 **Critique of this Preliminary Version**
 
@@ -235,7 +247,7 @@ This "blocking" approach is simple to understand, but it's not scalable. A bette
 
 In the next section, we will improve this sketch to solve these problems, creating a more robust foundation for our final project.
 
-**Part 3B: Uploading moisture data to ThingSpeak - an improved version**
+## Part 3B: Uploading moisture data to ThingSpeak - an improved version
 
 As we discussed, the `delay()` function in our first version makes our program "blocking," which is not ideal. To build a scalable IoT device, we need our code to be responsive and capable of handling multiple tasks at once.
 
@@ -293,6 +305,10 @@ The complete source code can be found in the `Code/4_ThingSpeak_Upload_Moisture_
 #define SENSOR_PIN A0 
 #define PUMP_RELAY_PIN 2
 
+// --- enable/disable ThingSpeak at compile time ---
+// comment to disable ThingSpeak uploads  
+// #define THINGSPEAK_ENABLE
+
 // --- Sensor Calibration ---
 // Replace these with the values you found in the calibration step
 const int DRY_VALUE = 680; // Raw ADC value for 0% moisture (in air)
@@ -330,9 +346,10 @@ void controlWaterPump();
 // SETUP: Runs once when the Arduino starts up
 // ==============================================================================
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_MON_BAUDRATE);
   Serial1.begin(ESP_BAUDRATE); // Initialize Serial1 for ESP8266 modem
-
+  delay(500); //a short delay to let Serial port settle
+    
   pinMode(PUMP_RELAY_PIN, OUTPUT);
   digitalWrite(PUMP_RELAY_PIN, LOW); // Ensure pump is OFF by default
 
@@ -360,11 +377,14 @@ void loop() {
     readMoisture();
   }
 
-  // Task 3: Upload data to ThingSpeak at its specified interval
+  // Task 3: Upload data to ThingSpeak at its specified interval 
+  // with conditional compilation (#define THINGSPEAK_ENABLE)
+  #if defined(THINGSPEAK_ENABLE)
   if (currentMillis - previousThingSpeakUploadMillis >= thingSpeakUploadInterval) {
     previousThingSpeakUploadMillis = currentMillis; // Save the time of this upload
     uploadToThingSpeak();
   }
+  #endif
 
   // Task 4: Control the water pump (runs on every loop)
   // This function will contain the logic to turn the pump on/off based on moisture
@@ -457,7 +477,8 @@ void controlWaterPump() {
 }
 ```
 
-**Part 4: React - Closing the Loop with Automated Watering**
+
+## Part 4: React - Closing the Loop with Automated Watering
 
 *   Safely connect a water pump to the Arduino using a relay module.
 *   Modify the Arduino code to automatically activate the water pump when the moisture level drops below the safe range.
