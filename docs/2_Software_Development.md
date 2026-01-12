@@ -137,7 +137,7 @@ With this reliable percentage reading, we are now ready to connect our project t
 
 ---
 
-## Part 3A: Uploading moisture data to ThingSpeak
+## Part 3A: Uploading moisture data to ThingSpeak - version 1
 
 Now that we can accurately measure soil moisture, the next step is to send this data to the ThingSpeak channel we configured. This will involve writing Arduino code that connects to your Wi-Fi and sends HTTP requests containing the sensor data.
 
@@ -167,7 +167,7 @@ char pass[] = "YOUR_PASSWORD";    // your network password
 
 const unsigned long myChannelNumber = 123456;             //replace it with your channel number
 const char *myWriteAPIKey = "channel_write_apikey";       //replace it with your channel write api key
-const unsigned int moistureFieldNumber = 1; 
+const unsigned int moistureFieldNumber = 1; 			  //replace it with your field number
 
 WiFiEspClient thingspeakClient;
 
@@ -236,64 +236,64 @@ ThingHTTP then sends a REST API request to CallMeBot, an external service that s
 
 **Critique of this Preliminary Version**
 
-The code above works, but it has a major flaw that makes it unsuitable for a real-world IoT project. The problem lies in the use of the `delay()` function:
+The code above works, but it has several major flaws that make it unsuitable for a real-world IoT project.
 
-- **`delay(60000)`:** This line pauses the entire program for 60 seconds.
-- **`delay(15000)`:** This line pauses the program for 15 seconds if a ThingSpeak upload fails.
+1.  **Blocking Code with `delay()`:** The most significant problem lies in the use of the `delay()` function. `delay(60000)` pauses the entire program for 60 seconds. During this time, the Arduino can do nothing else—it cannot read other sensors, respond to button presses, or, most importantly, **control a water pump**. This makes the system unresponsive.
 
-During these delays, the Arduino can do nothing else. It cannot read other sensors, it cannot respond to button presses, and most importantly, **it cannot control a water pump**. If we were to add code to turn on a pump, it would only be checked once every minute, which is not responsive enough for a real-time system.
+2.  **No Offline Resilience:** The program requires a constant internet connection. If the Wi-Fi router is down or the credentials are wrong, the `WiFi.begin(ssid, pass)` call inside the `while` loop will block forever, preventing the device from performing any other tasks, like controlling a pump locally. A robust IoT device should be able to function offline.
 
-This "blocking" approach is simple to understand, but it's not scalable. A better practice is to write **non-blocking code** and to **modularize** the program by breaking it down into smaller, independent functions (e.g., one function for reading the sensor, another for handling WiFi, and a third for uploading data).
+3.  **No Power Management:** The code runs in a continuous loop, consuming power at all times. For a battery-powered device that only needs to report data periodically, this is extremely inefficient. A real-world device would use a **deep sleep** mode to conserve battery, waking up only to take a reading and upload data.
+Unfortunately, the existing hardware combination **Arduino Mega 2560 + ESP8266** is not well-suited for simple, low-power sleep because we are running two independent chips. We can put the Mega 2560 into a low-power sleep mode, but the ESP8266 module will remain fully powered on and continue to draw a significant amount of current. We will solve this with a standalone ESP32 solution coming next.
 
-In the next section, we will improve this sketch to solve these problems, creating a more robust foundation for our final project.
+For now, we will focus on solving the first two problems. The next section introduces an improved sketch that uses **non-blocking code** and handles connection failures gracefully, creating a more robust foundation for our final project.
 
-## Part 3B: Uploading moisture data to ThingSpeak - an improved version
+## Part 3B: Uploading moisture data to ThingSpeak - version 2
 
-As we discussed, the `delay()` function in our first version makes our program "blocking," which is not ideal. To build a scalable IoT device, we need our code to be responsive and capable of handling multiple tasks at once.
+As we discussed, the `v1` sketch has major flaws: its use of `delay()` makes it unresponsive, and its Wi-Fi connection logic can cause the entire program to freeze. This second version (`v2`) solves these problems and adds visual feedback, creating a much more robust and user-friendly foundation.
 
-This second version (`v2`) of the program solves this problem by replacing `delay()` with a non-blocking timing mechanism using the `millis()` function. This is a fundamental best practice in Arduino programming.
-
-**The Goal:** Rewrite the program to be non-blocking and modular, creating a stable foundation for adding a water pump later.
+**The Goal:** Rewrite the program to be non-blocking, resilient, and provide clear visual status updates.
 
 **Key Concepts in the New Code**
 
-1.  **Non-Blocking Timing with `millis()`:** The `millis()` function returns the number of milliseconds since the Arduino board began running. By storing the time of the last action (e.g., `previousSensorReadMillis`) and periodically checking if enough time has passed (`currentMillis - previousSensorReadMillis >= interval`), we can execute tasks at set intervals without ever pausing the entire program.
-
-2.  **A Responsive `loop()`:** Because we removed all the long `delay()` calls, the main `loop()` function now runs thousands of times per second. This allows us to check sensors, manage connections, and react to events in near real-time.
-
-3.  **Modular Functions:** The code is now broken down into smaller, single-purpose functions like `readMoisture()`, `uploadToThingSpeak()`, and `connectWiFi()`. This makes the program much easier to read, understand, and debug.
+1. **Non-Blocking Timing with `millis()`:** The `millis()` function returns the number of milliseconds since the Arduino board began running. By storing the time of the last action (e.g., `previousSensorReadMillis` ) and periodically checking if enough time has passed (`currentMillis - previousSensorReadMillis >= interval`), we can execute tasks at set intervals without ever pausing the entire program.
+2. **A Responsive `loop()`:** Because we removed all the long `delay()` calls, the main `loop()` function now runs thousands of times per second. This allows us to check sensors, manage connections, and react to events in near real-time.
+3. **Resilient Module Check:** In `setup()`, the code now checks if the ESP8266 module is physically connected and responding. If not, it prints a clear error message and disables all network functions, allowing the rest of the program (like sensor reading and pump control) to run without getting stuck.
+4. **Efficient, On-Demand Wi-Fi:** Instead of constantly trying to stay connected, the code now only attempts to connect to Wi-Fi right before it needs to upload data. This is much more efficient and significantly reduces how often the blocking `WiFi.begin()` function pauses the loop.
+5. **Visual Status with LEDs:** A new `ledBlinky()` function provides instant visual feedback on the system's status:
+   - A **blinking red LED** indicates that there is no Wi-Fi connection (or the module is missing).
+   - A **blinking blue LED** provides a clear confirmation that the device is successfully connected to Wi-Fi.
 
 **The Complete V2 Code**
-
-The complete source code can be found in the `Code/4_ThingSpeak_Upload_Moisture_v2/` folder. This new structure is the foundation for our final project. Notice the placeholder function `controlWaterPump()`—because the main loop is non-blocking, we can now add our pump logic here without disrupting the other tasks.
+The complete source code can be found in the `Code/4_ThingSpeak_Upload_Moisture_v2/` folder. This new structure is the foundation for our final project. Notice the function `controlWaterPump()`is a placeholder for later implementation.
 
 ```C++
-// File: 4_ThingSpeak_Upload_Moisture_v2.ino
 /********************************************************************************
  * File: 4_ThingSpeak_Upload_Moisture_v2.ino
  * 
  * Description:
  * This sketch is an improved, non-blocking version for reading a soil moisture
- * sensor and uploading the data to ThingSpeak. It avoids using delay() by
- * tracking time with the millis() function. This allows the program to remain
- * responsive and handle multiple tasks concurrently, such as checking sensor
- * values, managing a Wi-Fi connection, and (in the future) controlling a 
- * water pump.
+ * sensor and uploading the data to ThingSpeak using an Arduino Mega and
+ * ESP8266 WiFi module. It avoids using delay() by tracking time with the 
+ * millis() function. This allows the program to remain responsive and handle 
+ * multiple tasks concurrently.
  * 
  * Key Improvements from v1:
  * 1. Non-Blocking Timing: Uses millis() instead of delay() to manage sensor 
  *    reading and data upload intervals.
- * 2. Modular Functions: Code is broken into smaller, single-purpose functions
- *    (e.g., readMoisture(), handleWiFi(), uploadToThingSpeak()).
+ * 2. Modular Functions: Code is broken into smaller, single-purpose functions.
  * 3. Responsive Loop: The main loop() runs continuously, allowing for near
  *    real-time control and responsiveness.
- * 4. Scalability: This structure makes it easy to add new features, like a
- *    water pump, without rewriting the core logic.
+ * 4. Efficient WiFi Handling: The code now only attempts to connect to WiFi
+ *    right before it needs to upload data, reducing unnecessary blocking.
+ * 5. New blinky LED feature to indicate WiFi status.
+ *    Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
  * 
- * Hardware Connections (as per 1_Hardware_Setup.md):
+ * Hardware Connections (Arduino Mega + ESP8266):
  * - Moisture Sensor AO -> Arduino A0
  * - ESP8266 TX/RX     -> Arduino RX1/TX1 (Serial1)
  * - Water Pump Relay  -> Arduino GPIO2
+ * - Red LED Input -> Arduino GPIO3 
+ * - Blue LED Input -> Arduino GPIO4
  * 
  ********************************************************************************/
 
@@ -303,11 +303,9 @@ The complete source code can be found in the `Code/4_ThingSpeak_Upload_Moisture_
 
 // --- Hardware Pin Definitions ---
 #define SENSOR_PIN A0 
-#define PUMP_RELAY_PIN 2
-
-// --- enable/disable ThingSpeak at compile time ---
-// comment to disable ThingSpeak uploads  
-// #define THINGSPEAK_ENABLE
+#define PUMP_RELAY_PIN  2
+#define LED_RED_PIN     3
+#define LED_BLUE_PIN    4
 
 // --- Sensor Calibration ---
 // Replace these with the values you found in the calibration step
@@ -316,6 +314,7 @@ const int WET_VALUE = 250; // Raw ADC value for 100% moisture (in water)
 
 // --- Wi-Fi & ThingSpeak Configuration ---
 #define ESP_BAUDRATE 115200
+#define SERIAL_MON_BAUDRATE 115200
 char ssid[] = "YOUR_SSID";     // Your network SSID (name)
 char pass[] = "YOUR_PASSWORD"; // Your network password
 
@@ -326,21 +325,25 @@ const unsigned int moistureFieldNumber = 1;          // Field number for moistur
 // --- Global Variables ---
 WiFiEspClient thingspeakClient;
 int currentMoisturePercent = 0; // Holds the latest sensor reading
+bool isWifiModuleOK = false;    // Flag to track if the ESP8266 is responding
 
 // --- Timing Control (Non-Blocking) ---
 // Used to track time for various tasks without using delay()
 unsigned long previousSensorReadMillis = 0;
 unsigned long previousThingSpeakUploadMillis = 0;
+unsigned long previousLedBlinkyMillis = 0;
 
 // Set the intervals for how often tasks should run (in milliseconds)
 const long sensorReadInterval = 5000;       // Read sensor every 5 seconds
 const long thingSpeakUploadInterval = 60000; // Upload to ThingSpeak every 60 seconds
+const long ledBlinkyInterval = 1000;  //led blinks in 1 second, with "red led => no wifi", "blue led => good wifi"
 
 // --- Function Prototypes ---
 void connectWiFi();
 void readMoisture();
 void uploadToThingSpeak();
 void controlWaterPump();
+void ledBlinky();
 
 // ==============================================================================
 // SETUP: Runs once when the Arduino starts up
@@ -351,9 +354,27 @@ void setup() {
   delay(500); //a short delay to let Serial port settle
     
   pinMode(PUMP_RELAY_PIN, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT);
+  pinMode(LED_BLUE_PIN, OUTPUT);
   digitalWrite(PUMP_RELAY_PIN, LOW); // Ensure pump is OFF by default
+  digitalWrite(LED_RED_PIN, LOW); //turn off RED and BLUE LEDs to start with
+  digitalWrite(LED_BLUE_PIN, LOW);
 
-  connectWiFi(); // Initial attempt to connect to Wi-Fi
+  WiFi.init(&Serial1);
+  
+  // Check if the WiFi module is responding.
+  if (WiFi.status() == WL_NO_SHIELD) {
+    Serial.println("******************************************************");
+    Serial.println("ERROR: ESP8266 WiFi module not detected or not responding.");
+    Serial.println(" - Check wiring between Mega and ESP8266.");
+    Serial.println(" - Ensure ESP8266 has sufficient power.");
+    Serial.println(" - The program will continue to run without WiFi.");
+    Serial.println("******************************************************");
+    isWifiModuleOK = false; // Set flag to prevent further WiFi attempts
+  } else {
+    Serial.println("WiFi module detected.");
+    isWifiModuleOK = true; // WiFi module is OK
+  }
 
   ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
 }
@@ -365,30 +386,38 @@ void loop() {
   // Get the current time at the start of the loop
   unsigned long currentMillis = millis();
 
-  // Task 1: Maintain Wi-Fi Connection (runs on every loop)
-  // If Wi-Fi disconnects, this will attempt to reconnect.
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
-  }
-
-  // Task 2: Read the moisture sensor at its specified interval
+  // Task 1: Read the moisture sensor at its specified interval
   if (currentMillis - previousSensorReadMillis >= sensorReadInterval) {
     previousSensorReadMillis = currentMillis; // Save the time of this reading
     readMoisture();
   }
 
-  // Task 3: Upload data to ThingSpeak at its specified interval 
-  // with conditional compilation (#define THINGSPEAK_ENABLE)
-  #if defined(THINGSPEAK_ENABLE)
+  // Task 2: Attempt to upload data to ThingSpeak at its specified interval
   if (currentMillis - previousThingSpeakUploadMillis >= thingSpeakUploadInterval) {
-    previousThingSpeakUploadMillis = currentMillis; // Save the time of this upload
-    uploadToThingSpeak();
+    previousThingSpeakUploadMillis = currentMillis; // Save the time of this attempt
+    
+    // Only proceed if the WiFi module was detected at startup
+    if (isWifiModuleOK) {
+      // If not connected, try to connect now.
+      if (WiFi.status() != WL_CONNECTED) {
+        connectWiFi(); 
+      }
+      
+      // After the connection attempt, check again before uploading.
+      if (WiFi.status() == WL_CONNECTED) {
+        uploadToThingSpeak();
+      }
+    }
   }
-  #endif
 
-  // Task 4: Control the water pump (runs on every loop)
-  // This function will contain the logic to turn the pump on/off based on moisture
+  // Task 3: Control the water pump (runs on every loop)
   controlWaterPump();
+
+  // Task 4: Blink the LED to give a visual signal
+  if(currentMillis - previousLedBlinkyMillis >= ledBlinkyInterval){
+    previousLedBlinkyMillis = currentMillis;
+    ledBlinky();
+  }
 }
 
 // ==============================================================================
@@ -396,28 +425,13 @@ void loop() {
 // ==============================================================================
 
 /**
- * @brief Connects to the Wi-Fi network.
- * It will block until a connection is established.
+ * @brief Attempts to connect to the Wi-Fi network.
+ * NOTE: WiFi.begin() is a BLOCKING call and can take several seconds to
+ * execute. During this time, the main loop will be paused.
  */
 void connectWiFi() {
-  WiFi.init(&Serial1);
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("ERROR: WiFi shield not present");
-    while (true); // Halt execution
-  }
-
-  Serial.print("Attempting to connect to SSID: ");
-  Serial.println(ssid);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    WiFi.begin(ssid, pass);
-    Serial.print(".");
-    delay(2000); // Use a short delay ONLY for connection attempts
-  }
-
-  Serial.println("\nWiFi Connected!");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  Serial.println("Attempting to connect to WiFi (this may block for a few seconds)...");
+  WiFi.begin(ssid, pass);
 }
 
 /**
@@ -443,11 +457,6 @@ void readMoisture() {
  * @brief Uploads the current moisture percentage to ThingSpeak.
  */
 void uploadToThingSpeak() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Cannot upload data: WiFi not connected.");
-    return;
-  }
-
   Serial.println("Uploading data to ThingSpeak...");
   ThingSpeak.setField(moistureFieldNumber, currentMoisturePercent);
 
@@ -457,14 +466,11 @@ void uploadToThingSpeak() {
     Serial.println("ThingSpeak upload successful.");
   } else {
     Serial.println("Problem uploading to ThingSpeak. HTTP error code " + String(httpCode));
-    // Note: No delay() or while() loop here. If it fails, it will simply
-    // try again on the next scheduled interval.
   }
 }
 
 /**
  * @brief Placeholder function for water pump control logic.
- * This function can now be called on every loop without being blocked.
  */
 void controlWaterPump() {
   // This is where you would add the logic to control the pump.
@@ -474,6 +480,22 @@ void controlWaterPump() {
   // } else {
   //   digitalWrite(PUMP_RELAY_PIN, LOW);  // Turn pump OFF
   // }
+}
+
+/**
+ * @brief Blinks the LED to indicate WiFi status.
+ * Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
+ */
+void ledBlinky() {
+  if(isWifiModuleOK && WiFi.status() == WL_CONNECTED){
+    // Blink Blue LED
+    digitalWrite(LED_RED_PIN, LOW); // Ensure RED is OFF
+    digitalWrite(LED_BLUE_PIN, !digitalRead(LED_BLUE_PIN)); // Toggle BLUE LED
+  } else {
+    // Blink Red LED
+    digitalWrite(LED_BLUE_PIN, LOW); // Ensure BLUE is OFF
+    digitalWrite(LED_RED_PIN, !digitalRead(LED_RED_PIN)); // Toggle RED LED
+  }
 }
 ```
 
