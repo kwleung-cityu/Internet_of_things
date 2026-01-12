@@ -12,7 +12,7 @@ char pass[] = "YOUR_PASSWORD";    // your network password
 
 const unsigned long myChannelNumber = 123456;             //replace it with your channel number
 const char *myWriteAPIKey = "channel_write_apikey";       //replace it with your channel write api key
-const unsigned int moistureFieldNumber = 1; 
+const unsigned int moistureFieldNumber = 1;               //replace it with your field numner
 
 WiFiEspClient thingspeakClient;
 
