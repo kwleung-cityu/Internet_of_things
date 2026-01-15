@@ -1,31 +1,25 @@
 /********************************************************************************
- * File: 4_ThingSpeak_Upload_Moisture_v2.ino
+ * File: 5_Run_WaterPump_with_Delay.ino
  * 
  * Description:
- * This sketch is an improved, non-blocking version for reading a soil moisture
- * sensor and uploading the data to ThingSpeak using an Arduino Mega and
- * ESP8266 WiFi module. It avoids using delay() by tracking time with the 
- * millis() function. This allows the program to remain responsive and handle 
- * multiple tasks concurrently.
+ * This sketch demonstrates how to integrate a water pump into the IoT system
+ * using a simple, but flawed, `delay()`-based approach. It serves as an
+ * educational example to highlight the problems with blocking code in a
+ * responsive system.
  * 
- * Key Improvements from v1:
- * 1. Non-Blocking Timing: Uses millis() instead of delay() to manage sensor 
- *    reading and data upload intervals.
- * 2. Modular Functions: Code is broken into smaller, single-purpose functions.
- * 3. Responsive Loop: The main loop() runs continuously, allowing for near
- *    real-time control and responsiveness.
- * 4. Efficient WiFi Handling: The code now only attempts to connect to WiFi
- *    right before it needs to upload data, reducing unnecessary blocking.
- * 5. New blinky LED feature to indicate WiFi status.
- *    Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
+ * While the non-blocking `millis()` structure is used for sensor reading and
+ * ThingSpeak uploads, the water pump control itself is handled by a function
+ * that uses long, blocking `delay()` calls.
  * 
- * Hardware Connections (Arduino Mega + ESP8266):
- * - Moisture Sensor AO -> Arduino A0
- * - ESP8266 TX/RX     -> Arduino RX1/TX1 (Serial1)
- * - Water Pump Relay  -> Arduino GPIO2
- * - Red LED Input -> Arduino GPIO3 
- * - Blue LED Input -> Arduino GPIO4
- * 
+ * Key Features & Learning Points:
+ * 1. Blocking Pump Control: The `runWaterPumpCycle_with_delay()` function
+ *    completely halts the microcontroller's execution.
+ * 2. Hysteresis Logic: It correctly uses a lower and upper moisture threshold
+ *    to decide when to start the watering cycle.
+ * 3. The "Delay" Problem: When the pump cycle runs, you will observe that
+ *    the status LEDs stop blinking and the Serial Monitor provides no updates.
+ *    This is because the main `loop()` is frozen, demonstrating why `delay()`
+ *    is unsuitable for responsive, multi-tasking projects.
  ********************************************************************************/
 
 // --- Libraries ---
@@ -69,11 +63,19 @@ const long sensorReadInterval = 5000;       // Read sensor every 5 seconds
 const long thingSpeakUploadInterval = 60000; // Upload to ThingSpeak every 60 seconds
 const long ledBlinkyInterval = 1000;  //led blinks in 1 second, with "red led => no wifi", "blue led => good wifi"
 
+// Pump turn-on time and soak time - need tuning for your own case
+const unsigned int pumpOnTime = 1000; // Pump ON time in milliseconds (1 second)
+const unsigned int pumpSoakTime = 20000; // Soak time in milliseconds (20 seconds)
+// Hysteresis upper and lower moisture threshold values - also need tuning for your own case
+const unsigned int upperMoistureThreshold = 35; // Upper threshold in %
+const unsigned int lowerMoistureThreshold = 30; // Lower threshold in %
+
 // --- Function Prototypes ---
 void connectWiFi();
 void readMoisture();
 void uploadToThingSpeak();
 void controlWaterPump();
+void runWaterPumpCycle_with_delay(unsigned int onTime, unsigned int soakTime);
 void ledBlinky();
 
 // ==============================================================================
@@ -205,6 +207,14 @@ void uploadToThingSpeak() {
  */
 void controlWaterPump() {
   // This is where you would add the logic to control the pump.
+  if(currentMoisturePercent < lowerMoistureThreshold){
+    Serial.println("Moisture below lower threshold. Starting watering cycle.");
+    runWaterPumpCycle_with_delay(pumpOnTime, pumpSoakTime);
+  } else if(currentMoisturePercent > upperMoistureThreshold){
+    Serial.println("Moisture above upper threshold. Too much water, need intervention.");
+  } else {
+    // do nothing, within hysteresis band
+  } 
 }
 
 /**
@@ -221,4 +231,31 @@ void ledBlinky() {
     digitalWrite(LED_BLUE_PIN, LOW); // Ensure BLUE is OFF
     digitalWrite(LED_RED_PIN, !digitalRead(LED_RED_PIN)); // Toggle RED LED
   }
+}
+
+/**
+ * * 
+ * @brief Runs a water pump cycle with blocking delays.
+ * @param onTime Duration (in milliseconds) to keep the pump ON.
+ * @param soakTime Duration (in milliseconds) to wait after turning the pump OFF.
+ * NOTE: This function uses blocking delay() calls, which will pause the main loop.
+ */
+void runWaterPumpCycle_with_delay(unsigned int onTime, unsigned int soakTime) {
+  // 1. Turn the water pump ON
+  digitalWrite(PUMP_RELAY_PIN, HIGH);
+  Serial.println("Pump ON");
+
+  // 2. Wait for the specified 'onTime' duration.
+  //    !!! This is a BLOCKING call. The MCU can do nothing else. !!!
+  delay(onTime);
+
+  // 3. Turn the water pump OFF
+  digitalWrite(PUMP_RELAY_PIN, LOW);
+  Serial.println("Pump OFF");
+
+  // 4. Wait for the 'soakTime' to allow water to absorb.
+  //    !!! This is also a BLOCKING call. !!!
+  Serial.println("Program trapped in delay(soakTime). You won't see LED blinking!");
+  delay(soakTime);
+  Serial.println("Soak time complete. Cycle finished.");
 }

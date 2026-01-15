@@ -14,35 +14,23 @@ The analog output of the moisture sensor gives us a raw number, not a percentage
 **0% Moisture:** The sensor is completely dry (in open air).
 **100% Moisture:** The sensor is fully submerged in water.
 
-```C
-// File: 1_Calibrate_Moisture_Sensor.ino
-// Connect the sensor's AO pin to the Arduino's A0 pin.
-#define SENSOR_PIN A0 
-
-void setup() {
-  // Start the serial communication to see output on the Serial Monitor
-  Serial.begin(115200);
-}
-
-void loop() {
-  // Read the raw analog value from the sensor
-  int rawValue = analogRead(SENSOR_PIN);
-  
-  Serial.print("Raw Analog Value: ");
-  Serial.println(rawValue);
-
-  delay(1000); // Wait for one second
-}
-```
+To do this, we will upload a simple program that reads the raw analog value from the sensor and prints it to the Serial Monitor.
 
 **The Calibration Process**
 
-The code for this step can be found in the `Code/1_Calibrate_Moisture_Sensor/` folder. 
+The complete code for this step can be found in the `Code/1_Calibrate_Moisture_Sensor/` folder. 
 
-1. Upload the `.ino` code above to your Arduino.
+1. Upload the `1_Calibrate_Moisture_Sensor.ino` code to your Arduino.
+
 2. Open the Serial Monitor (`Tools -> Serial Monitor`) and set the baud rate to **115200**.
+
 3. **Test the "Dry" value:** Hold the sensor in the open air for a few seconds and write down the raw value you see. This will be your 0% moisture reading.
+
+   <img src= "./images/1767932427613.jpg">
+
 4. **Test the "Wet" value:** Dip the sensor prongs completely into a glass of water. Write down the new raw value. This will be your 100% moisture reading.
+
+   <img src = "./images/1767932416225.jpg">
 
 **Example Results**
 
@@ -68,61 +56,25 @@ Now that we have our unique calibration values, we can write a new program to co
 
 **The Goal:** Create a program that prints the soil moisture as a percentage.
 
-**1. The Code**
+This program uses the `WET_VALUE` and `DRY_VALUE` you found in Part 1. It reads the sensor's current raw value and mathematically maps it to a 0-100 scale using the `map()` function.
 
-This program uses the `WET_VALUE` and `DRY_VALUE` you found in Part 1. It reads the sensor's current raw value and mathematically maps it to a 0-100 scale.
+**Important:** Remember to replace the example values in the code with the actual calibration values you recorded for your sensor. The full code is in the `Code/2_Percentage_Moisture/` folder.
 
-**Important:** Remember to replace the example values in the code below with the actual calibration values you recorded for your sensor.
-
+The core of the conversion is this single line:
 ```C++
-// File: 2_Percentage_Moisture.ino
-#define SENSOR_PIN A0 
-
-// === Enter Your Calibration Values Here ===
-// Value from when the sensor was in open air (0% moisture)
-const int DRY_VALUE = 680; 
-// Value from when the sensor was in water (100% moisture)
-const int WET_VALUE = 250;  
-// ========================================
-
-void setup() {
-  Serial.begin(115200);
-}
-
-void loop() {
-  int rawValue = analogRead(SENSOR_PIN);
-  
-  // The map() function re-scales a number from one range to another.
-  // Notice that our raw value goes DOWN as moisture goes UP. 
-  // We map the range [DRY_VALUE, WET_VALUE] to the range [0, 100].
-  int moisturePercent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
-
-  // The constrain() function keeps the value within the 0-100 range,
-  // which is useful if the sensor reading ever goes slightly outside
-  // our calibration range.
-  moisturePercent = constrain(moisturePercent, 0, 100);
-
-  Serial.print("Raw: ");
-  Serial.print(rawValue);
-  Serial.print("  ->  Moisture: ");
-  Serial.print(moisturePercent);
-  Serial.println("%");
-
-  delay(1000);
-}
+// The map() function re-scales a number from one range to another.
+int moisturePercent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
 ```
 
-**2. How the Code Works**
+**How the Code Works**
 
-- **`DRY_VALUE` and `WET_VALUE`:** We store our calibration numbers in constant variables at the top of the code. This makes them easy to find and change.
-- **`map(rawValue, DRY_VALUE, WET_VALUE, 0, 100)`:** This is the core of our conversion. It tells the Arduino: "Take the `rawValue`. If it's equal to `DRY_VALUE` (680), the result is 0%. If it's equal to `WET_VALUE` (250), the result is 100%. For any value in between, calculate the proportional percentage." The function is smart enough to handle the fact that our "from" range is inverted (from a high number to a low one).
-- **`constrain(moisturePercent, 0, 100)`:** This is a safety function. It ensures that our final `moisturePercent` value will never be displayed as less than 0 or greater than 100, even if there's a strange spike in the sensor reading.
+- **`map(rawValue, DRY_VALUE, WET_VALUE, 0, 100)`:** This is the key function. It tells the Arduino: "Take the `rawValue`. If it's equal to `DRY_VALUE`, the result is 0%. If it's equal to `WET_VALUE`, the result is 100%. For any value in between, calculate the proportional percentage."
+- **`constrain(moisturePercent, 0, 100)`:** This is a safety function that ensures our final percentage value will never be less than 0 or greater than 100.
 
-**3. Testing the Program**
+**Testing the Program**
 
 The code for this step can be found in the `Code/2_Percentage_Moisture/` folder. 
-
-1. Upload the new code to your Arduino.
+1. Upload the `2_Percentage_Moisture.ino` code to your Arduino.
 2. Open Serial Monitor.
 3. Place the sensor in soil with varying levels of moisture. You should now see a clear percentage that reflects how wet the soil is!
 
@@ -134,6 +86,8 @@ Raw: 300  ->  Moisture: 88%
 ```
 
 With this reliable percentage reading, we are now ready to connect our project to the internet and complete the feedback loop.
+
+<img src = "./images/1768460341410.jpg">
 
 ---
 
@@ -153,76 +107,26 @@ Now that we can accurately measure soil moisture, the next step is to send this 
 
   <img src = "./images/wifiesp_library_installed.png">
 
-**Only new code** relevant to WiFi connection and ThingSpeak code are listed below. 
-
 **The complete source code can be found in the `Code/3_ThingSpeak_Upload_Moisture_v1/` folder.** 
 
-````C++
-#include "ThingSpeak.h"
-#include "WiFiEsp.h"
+This version introduces Wi-Fi connectivity and uploads the data to ThingSpeak. The key function call is `ThingSpeak.writeFields()`. However, as we will see, its main purpose is to demonstrate a flawed, blocking approach.
 
-#define ESP_BAUDRATE  115200
-char ssid[] = "YOUR_SSID";        // your network SSID (name) 
-char pass[] = "YOUR_PASSWORD";    // your network password
-
-const unsigned long myChannelNumber = 123456;             //replace it with your channel number
-const char *myWriteAPIKey = "channel_write_apikey";       //replace it with your channel write api key
-const unsigned int moistureFieldNumber = 1; 			  //replace it with your field number
-
-WiFiEspClient thingspeakClient;
-
-//existing code...
-
-void setup() {
-    //existing code...
-	WiFi.init(&Serial1);  //using Serial1 for ESP8266 modem
-  	// check for the presence of the shield
-  	if (WiFi.status() == WL_NO_SHIELD) {
-    	Serial.println("WiFi shield not present");
-    	// don't continue
-    	while (true);
-  	}
-  	// Connect or reconnect to WiFi
-  	if(WiFi.status() != WL_CONNECTED){
-    	while(WiFi.status() != WL_CONNECTED){
-      	Serial.print(".");
-      	WiFi.begin(ssid, pass);
-      	delay(500);     
-    	} 
-    Serial.println("\nConnected");
-  	}
-
-  	ThingSpeak.begin(thingspeakClient); //initialize ThingSpeak client    
-}
-
+The most important part of this code to analyze is the `loop()` function, which contains a long, 60-second delay:
+```C++
 void loop() {
-	bool upload_success_flag = false;
-    //existing code...
-  	ThingSpeak.setField(moistureFieldNumber, moisturePercent);
+  // ... code to read sensor and set field ...
 
-      while(!upload_success_flag){
-        int status_code = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-        if(status_code == 200){
-          Serial.println("Data upload successfully.");
-          upload_success_flag = true;
-        } else {
-          Serial.println("Problem updating field.  HTTP error code " + String(status_code));
-          Serial.println("Retrying...");
-          delay(15000); //cannot write more frequent than 15sec with free ThingSpeak account
-        }
-      }
+  // Upload data to ThingSpeak
+  ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
 
-  delay(60000);     //new value in 60sec interval    
+  // This delay BLOCKS the entire program for 60 seconds!
+  delay(60000);
 }
-````
+```
 
 **Results of running the program:**
 
 <img src = "./images/Thingspeak_upload_v1_serialmon.png">
-
-<img src = "./images/1767932416225.jpg">
-
-<img src= "./images/1767932427613.jpg">
 
 To send the soil moisture data to the cloud, the code calls the `ThingSpeak.writeFields()` function. ThingSpeak then automatically adds a timestamp to each new reading as it arrives, which allows us to track the moisture levels over time.
 
@@ -266,241 +170,167 @@ As we discussed, the `v1` sketch has major flaws: its use of `delay()` makes it 
 **The Complete V2 Code**
 The complete source code can be found in the `Code/4_ThingSpeak_Upload_Moisture_v2/` folder. This new structure is the foundation for our final project. Notice the function `controlWaterPump()`is a placeholder for later implementation.
 
+The key to this non-blocking approach is using `millis()` to check if a certain amount of time has passed before running a task, instead of using `delay()`. The basic pattern looks like this:
+
 ```C++
-/********************************************************************************
- * File: 4_ThingSpeak_Upload_Moisture_v2.ino
- * 
- * Description:
- * This sketch is an improved, non-blocking version for reading a soil moisture
- * sensor and uploading the data to ThingSpeak using an Arduino Mega and
- * ESP8266 WiFi module. It avoids using delay() by tracking time with the 
- * millis() function. This allows the program to remain responsive and handle 
- * multiple tasks concurrently.
- * 
- * Key Improvements from v1:
- * 1. Non-Blocking Timing: Uses millis() instead of delay() to manage sensor 
- *    reading and data upload intervals.
- * 2. Modular Functions: Code is broken into smaller, single-purpose functions.
- * 3. Responsive Loop: The main loop() runs continuously, allowing for near
- *    real-time control and responsiveness.
- * 4. Efficient WiFi Handling: The code now only attempts to connect to WiFi
- *    right before it needs to upload data, reducing unnecessary blocking.
- * 5. New blinky LED feature to indicate WiFi status.
- *    Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
- * 
- * Hardware Connections (Arduino Mega + ESP8266):
- * - Moisture Sensor AO -> Arduino A0
- * - ESP8266 TX/RX     -> Arduino RX1/TX1 (Serial1)
- * - Water Pump Relay  -> Arduino GPIO2
- * - Red LED Input -> Arduino GPIO3 
- * - Blue LED Input -> Arduino GPIO4
- * 
- ********************************************************************************/
+// At the top of your code
+unsigned long previousMillis = 0;
+const long interval = 1000; // 1 second
 
-// --- Libraries ---
-#include "ThingSpeak.h"
-#include "WiFiEsp.h"
-
-// --- Hardware Pin Definitions ---
-#define SENSOR_PIN A0 
-#define PUMP_RELAY_PIN  2
-#define LED_RED_PIN     3
-#define LED_BLUE_PIN    4
-
-// --- Sensor Calibration ---
-// Replace these with the values you found in the calibration step
-const int DRY_VALUE = 680; // Raw ADC value for 0% moisture (in air)
-const int WET_VALUE = 250; // Raw ADC value for 100% moisture (in water)
-
-// --- Wi-Fi & ThingSpeak Configuration ---
-#define ESP_BAUDRATE 115200
-#define SERIAL_MON_BAUDRATE 115200
-char ssid[] = "YOUR_SSID";     // Your network SSID (name)
-char pass[] = "YOUR_PASSWORD"; // Your network password
-
-const unsigned long myChannelNumber = 123456;        // Your ThingSpeak channel number
-const char *myWriteAPIKey = "channel_write_apikey";  // Your ThingSpeak Write API Key
-const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
-
-// --- Global Variables ---
-WiFiEspClient thingspeakClient;
-int currentMoisturePercent = 0; // Holds the latest sensor reading
-bool isWifiModuleOK = false;    // Flag to track if the ESP8266 is responding
-
-// --- Timing Control (Non-Blocking) ---
-// Used to track time for various tasks without using delay()
-unsigned long previousSensorReadMillis = 0;
-unsigned long previousThingSpeakUploadMillis = 0;
-unsigned long previousLedBlinkyMillis = 0;
-
-// Set the intervals for how often tasks should run (in milliseconds)
-const long sensorReadInterval = 5000;       // Read sensor every 5 seconds
-const long thingSpeakUploadInterval = 60000; // Upload to ThingSpeak every 60 seconds
-const long ledBlinkyInterval = 1000;  //led blinks in 1 second, with "red led => no wifi", "blue led => good wifi"
-
-// --- Function Prototypes ---
-void connectWiFi();
-void readMoisture();
-void uploadToThingSpeak();
-void controlWaterPump();
-void ledBlinky();
-
-// ==============================================================================
-// SETUP: Runs once when the Arduino starts up
-// ==============================================================================
-void setup() {
-  Serial.begin(SERIAL_MON_BAUDRATE);
-  Serial1.begin(ESP_BAUDRATE); // Initialize Serial1 for ESP8266 modem
-  delay(500); //a short delay to let Serial port settle
-    
-  pinMode(PUMP_RELAY_PIN, OUTPUT);
-  pinMode(LED_RED_PIN, OUTPUT);
-  pinMode(LED_BLUE_PIN, OUTPUT);
-  digitalWrite(PUMP_RELAY_PIN, LOW); // Ensure pump is OFF by default
-  digitalWrite(LED_RED_PIN, LOW); //turn off RED and BLUE LEDs to start with
-  digitalWrite(LED_BLUE_PIN, LOW);
-
-  WiFi.init(&Serial1);
-  
-  // Check if the WiFi module is responding.
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("******************************************************");
-    Serial.println("ERROR: ESP8266 WiFi module not detected or not responding.");
-    Serial.println(" - Check wiring between Mega and ESP8266.");
-    Serial.println(" - Ensure ESP8266 has sufficient power.");
-    Serial.println(" - The program will continue to run without WiFi.");
-    Serial.println("******************************************************");
-    isWifiModuleOK = false; // Set flag to prevent further WiFi attempts
-  } else {
-    Serial.println("WiFi module detected.");
-    isWifiModuleOK = true; // WiFi module is OK
-  }
-
-  ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
-}
-
-// ==============================================================================
-// LOOP: Runs continuously and is kept non-blocking
-// ==============================================================================
 void loop() {
-  // Get the current time at the start of the loop
   unsigned long currentMillis = millis();
 
-  // Task 1: Read the moisture sensor at its specified interval
-  if (currentMillis - previousSensorReadMillis >= sensorReadInterval) {
-    previousSensorReadMillis = currentMillis; // Save the time of this reading
-    readMoisture();
+  // Check if it's time to do something
+  if (currentMillis - previousMillis >= interval) {
+    // Save the time of this action
+    previousMillis = currentMillis;
+
+    // ... perform the action (e.g., read a sensor) ...
   }
-
-  // Task 2: Attempt to upload data to ThingSpeak at its specified interval
-  if (currentMillis - previousThingSpeakUploadMillis >= thingSpeakUploadInterval) {
-    previousThingSpeakUploadMillis = currentMillis; // Save the time of this attempt
-    
-    // Only proceed if the WiFi module was detected at startup
-    if (isWifiModuleOK) {
-      // If not connected, try to connect now.
-      if (WiFi.status() != WL_CONNECTED) {
-        connectWiFi(); 
-      }
-      
-      // After the connection attempt, check again before uploading.
-      if (WiFi.status() == WL_CONNECTED) {
-        uploadToThingSpeak();
-      }
-    }
-  }
-
-  // Task 3: Control the water pump (runs on every loop)
-  controlWaterPump();
-
-  // Task 4: Blink the LED to give a visual signal
-  if(currentMillis - previousLedBlinkyMillis >= ledBlinkyInterval){
-    previousLedBlinkyMillis = currentMillis;
-    ledBlinky();
-  }
-}
-
-// ==============================================================================
-// --- Helper Functions ---
-// ==============================================================================
-
-/**
- * @brief Attempts to connect to the Wi-Fi network.
- * NOTE: WiFi.begin() is a BLOCKING call and can take several seconds to
- * execute. During this time, the main loop will be paused.
- */
-void connectWiFi() {
-  Serial.println("Attempting to connect to WiFi (this may block for a few seconds)...");
-  WiFi.begin(ssid, pass);
-}
-
-/**
- * @brief Reads the moisture sensor and updates the global variable.
- */
-void readMoisture() {
-  int rawValue = analogRead(SENSOR_PIN);
   
-  // Map the raw value to a percentage
-  currentMoisturePercent = map(rawValue, DRY_VALUE, WET_VALUE, 0, 100);
-  
-  // Constrain the value to the 0-100 range to prevent invalid readings
-  currentMoisturePercent = constrain(currentMoisturePercent, 0, 100);
-
-  Serial.print("Sensor Reading -> Raw: ");
-  Serial.print(rawValue);
-  Serial.print(", Moisture: ");
-  Serial.print(currentMoisturePercent);
-  Serial.println("%");
-}
-
-/**
- * @brief Uploads the current moisture percentage to ThingSpeak.
- */
-void uploadToThingSpeak() {
-  Serial.println("Uploading data to ThingSpeak...");
-  ThingSpeak.setField(moistureFieldNumber, currentMoisturePercent);
-
-  int httpCode = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-
-  if (httpCode == 200) {
-    Serial.println("ThingSpeak upload successful.");
-  } else {
-    Serial.println("Problem uploading to ThingSpeak. HTTP error code " + String(httpCode));
-  }
-}
-
-/**
- * @brief Placeholder function for water pump control logic.
- */
-void controlWaterPump() {
-  // This is where you would add the logic to control the pump.
-  // For example:
-  // if (currentMoisturePercent < 30) {
-  //   digitalWrite(PUMP_RELAY_PIN, HIGH); // Turn pump ON
-  // } else {
-  //   digitalWrite(PUMP_RELAY_PIN, LOW);  // Turn pump OFF
-  // }
-}
-
-/**
- * @brief Blinks the LED to indicate WiFi status.
- * Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
- */
-void ledBlinky() {
-  if(isWifiModuleOK && WiFi.status() == WL_CONNECTED){
-    // Blink Blue LED
-    digitalWrite(LED_RED_PIN, LOW); // Ensure RED is OFF
-    digitalWrite(LED_BLUE_PIN, !digitalRead(LED_BLUE_PIN)); // Toggle BLUE LED
-  } else {
-    // Blink Red LED
-    digitalWrite(LED_BLUE_PIN, LOW); // Ensure BLUE is OFF
-    digitalWrite(LED_RED_PIN, !digitalRead(LED_RED_PIN)); // Toggle RED LED
-  }
+  // The loop continues to run without pausing
 }
 ```
 
+This pattern is applied to the sensor reading, the ThingSpeak upload, and the LED blinking, making the entire sketch responsive.
 
-## Part 4: React - Closing the Loop with Automated Watering
+### Part 4: Automated Watering
 
-*   Safely connect a water pump to the Arduino using a relay module.
-*   Modify the Arduino code to automatically activate the water pump when the moisture level drops below the safe range.
+This final step closes the loop, creating a fully automated plant watering system. We will integrate a water pump and program the microcontroller to react to changes in soil moisture.
+
+**1. Hardware Setup:**
+
+*   Safely connect a water pump to the microcontroller using a relay module. This is crucial for isolating the high-power pump from the sensitive logic circuits.
+
+**2. Control Logic - Hysteresis:**
+To prevent the pump from rapidly switching on and off (a problem known as "chattering") and to avoid over-watering, we will implement a control strategy called **hysteresis**.
+
+Instead of a single "too dry" setpoint, we'll use two thresholds:
+* **Low Threshold (e.g., 30% moisture):** If the soil moisture drops *below* this level, turn the pump **ON** for a fixed duration (e.g., 1 second).
+
+* **High Threshold (e.g., 35% moisture):** The pump will remain **OFF** as long as the moisture is *above* the low threshold. This gap prevents the pump from turning on and off with small fluctuations.
+
+Using two different thresholds creates a stable system that doesn't constantly react to minor sensor value changes.
+
+**3. Implementing the Pump Control Function**
+We will create a function, `runWaterPumpCycle()`, that runs the pump for a specific amount of time (`onTime`) and then waits for a `soakTime` to allow the water to absorb into the soil before the system continues. The sensor reading will lag behind the actual moisture level, so this soak time is critical to prevent over-watering.
+
+There are two ways to implement this timing: a simple but blocking method using `delay()`, and a more advanced but non-blocking method using `millis()`. We will explore both to understand the trade-offs.
+
+### Method 1: Using `delay()` (The "Easy but Bad" Way)
+This is the most straightforward approach. The function will execute its steps in a simple, linear sequence and will not return until the entire cycle (watering and soaking) is complete. This serves as a good example of what *not* to do in a responsive project.
+
+The full code for this example can be found in the `Code/5_Run_WaterPump_with_Delay/` folder.
+
+```C++
+// This function is called when moisture is low
+void runWaterPumpCycle_with_delay(unsigned int onTime, unsigned int soakTime) {
+  // 1. Turn the water pump ON
+  digitalWrite(PUMP_RELAY_PIN, HIGH);
+  Serial.println("Pump ON");
+
+  // 2. Wait for the 'onTime' duration.
+  //    !!! This is a BLOCKING call. The MCU can do nothing else. !!!
+  delay(onTime);
+
+  // 3. Turn the water pump OFF
+  digitalWrite(PUMP_RELAY_PIN, LOW);
+  Serial.println("Pump OFF");
+
+  // 4. Wait for the 'soakTime' to allow water to absorb.
+  //    !!! This is also a BLOCKING call. The program is frozen. !!!
+  Serial.println("Program trapped in delay(soakTime). You won't see LEDs blinking!");
+  delay(soakTime);
+  
+  Serial.println("Soak time complete. Cycle finished.");
+}
+```
+
+**Why This Is a Problem:**
+*   **Blocking:** While `delay()` is running, the microcontroller is completely frozen. It cannot read sensors, check Wi-Fi status, or respond to any other events.
+*   **Unresponsive:** If `onTime` is 1 second and `soakTime` is 20 seconds, your entire device will be unresponsive for 21 seconds. This breaks the non-blocking architecture we worked hard to build.
+
+### Method 2: Using `millis()` (The "Correct" Non-Blocking Way)
+
+This approach uses a **state machine**. Instead of halting the program, it uses the main `loop()` to continuously check if it's time to transition to the next state (e.g., from `WATERING` to `SOAKING`). This allows the device to remain fully responsive to other tasks.
+
+The state machine can be visualized like this:
+<img src = "./images/water_state_machine.svg">
+
+This requires adding a few global variables to track the current state and the time of the last state change. The full code for this superior method is in the `Code/6_Run_WaterPump_with_Millis/` folder.
+
+```C++
+// --- Add these new global variables to track the pump's state ---
+enum PumpState { IDLE, WATERING, SOAKING };
+PumpState currentPumpState = IDLE;
+unsigned long pumpStateChangeMillis = 0; // Tracks time for the current state
+
+// --- This function STARTS the cycle ---
+void startWaterPumpCycle() {
+  // Only start a new cycle if the pump is currently idle
+  if (currentPumpState == IDLE) {
+    currentPumpState = WATERING;
+    pumpStateChangeMillis = millis(); // Record the time we started watering
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    Serial.println("Pump cycle started: WATERING");
+  }
+}
+
+// --- This function MANAGES the cycle and is called on every loop ---
+void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime) {
+  // State 1: The pump is currently WATERING
+  if (currentPumpState == WATERING) {
+    if (millis() - pumpStateChangeMillis >= onTime) {
+      // Time's up, switch to the SOAKING state
+      currentPumpState = SOAKING;
+      pumpStateChangeMillis = millis(); // Record the time we started soaking
+      digitalWrite(PUMP_RELAY_PIN, LOW);
+      Serial.println("Watering finished. Now SOAKING.");
+    }
+  }
+  // State 2: The soil is currently SOAKING
+  else if (currentPumpState == SOAKING) {
+    if (millis() - pumpStateChangeMillis >= soakTime) {
+      // Time's up, the cycle is complete. Return to IDLE.
+      currentPumpState = IDLE;
+      Serial.println("Soak time complete. Pump cycle finished.");
+    }
+  }
+}
+
+// --- How it's used inside controlWaterPump() ---
+void controlWaterPump() {
+  // If moisture is too low, start the cycle.
+  if(currentMoisturePercent < lowerMoistureThreshold){
+    startWaterPumpCycle(); // This just sets the state and returns instantly.
+  }
+  
+  // Manage the pump state on every single loop iteration.
+  // This function handles the timing and state changes internally.
+  manageWaterPumpCycle(pumpOnTime, pumpSoakTime);  
+}
+```
+
+**Why This is Better:**
+*   **Non-Blocking:** The `manageWaterPumpCycle` function executes and finishes in microseconds, allowing the main `loop()` to continue running freely.
+*   **Responsive:** The device can continue to perform all its other tasks (reading sensors, blinking LEDs, checking network status) while the pump cycle is in progress. **This is the correct approach for a robust IoT device.**
+*   **More Complex, But More Powerful:** While this method requires more code (an `enum` for state, state-tracking variables, and multiple functions), it is a fundamental pattern for writing reliable embedded software.
+
+---
+
+## What We Learned
+
+Throughout this guide, we have progressed from a simple sensor reading to a complete, automated IoT system. Here are the key software engineering and embedded systems concepts we've put into practice:
+
+1.  **The Importance of Calibration:** We learned that raw sensor data is often not directly useful. Calibrating our sensor against known physical states (completely dry and completely wet) was a critical first step to getting meaningful, real-world data (a percentage).
+
+2.  **Incremental Development:** We did not try to build the entire system at once. We built and tested each component in isolation: first the sensor, then the internet connection, and finally the pump. This iterative approach makes debugging vastly simpler.
+
+3.  **Blocking vs. Non-Blocking Code:** This was the most important lesson. We saw firsthand how using `delay()` (blocking code) in our `v1` sketch and the `delay()` pump example made the entire system unresponsive. We then learned to use the `millis()` function to create non-blocking timers, allowing our final program to handle multiple tasks (reading, uploading, blinking, pumping) concurrently.
+
+4.  **State Machines for Complex Tasks:** To manage the multi-step watering process without blocking, we implemented a simple but powerful state machine (`IDLE`, `WATERING`, `SOAKING`). This is a fundamental pattern in embedded systems for handling any process that unfolds over time.
+
+5.  **Control Theory in Practice (Hysteresis):** We implemented a simple control algorithm (hysteresis) by using two different thresholds for turning the pump on and off. This prevented the system from "chattering" and made the watering cycle stable and predictable.
+
+By following these steps, we have created a robust and reliable piece of software that is far more than just a simple script. It is a small but complete embedded system.
+

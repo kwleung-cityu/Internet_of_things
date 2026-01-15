@@ -1,31 +1,27 @@
 /********************************************************************************
- * File: 4_ThingSpeak_Upload_Moisture_v2.ino
+ * File: 6_Run_WaterPump_with_Millis.ino
  * 
  * Description:
- * This sketch is an improved, non-blocking version for reading a soil moisture
- * sensor and uploading the data to ThingSpeak using an Arduino Mega and
- * ESP8266 WiFi module. It avoids using delay() by tracking time with the 
- * millis() function. This allows the program to remain responsive and handle 
- * multiple tasks concurrently.
+ * This sketch represents the complete, non-blocking IoT code for a fully
+ * automated plant watering system. It builds upon the responsive foundation of
+ * the 'v2' sketch and integrates the final component: the water pump.
  * 
- * Key Improvements from v1:
- * 1. Non-Blocking Timing: Uses millis() instead of delay() to manage sensor 
- *    reading and data upload intervals.
- * 2. Modular Functions: Code is broken into smaller, single-purpose functions.
- * 3. Responsive Loop: The main loop() runs continuously, allowing for near
- *    real-time control and responsiveness.
- * 4. Efficient WiFi Handling: The code now only attempts to connect to WiFi
- *    right before it needs to upload data, reducing unnecessary blocking.
- * 5. New blinky LED feature to indicate WiFi status.
- *    Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
+ * The core of this sketch is the non-blocking, millis()-based state machine
+ * that controls the water pump. This allows the system to run a complete
+ * watering and soaking cycle without ever using a delay() function, ensuring
+ * the main loop remains responsive at all times.
  * 
- * Hardware Connections (Arduino Mega + ESP8266):
- * - Moisture Sensor AO -> Arduino A0
- * - ESP8266 TX/RX     -> Arduino RX1/TX1 (Serial1)
- * - Water Pump Relay  -> Arduino GPIO2
- * - Red LED Input -> Arduino GPIO3 
- * - Blue LED Input -> Arduino GPIO4
- * 
+ * Key Features:
+ * 1. Automated Pump Control: Implements a state machine with IDLE, WATERING,
+ *    and SOAKING states to manage the pump cycle.
+ * 2. Hysteresis Logic: Uses a lower and upper moisture threshold to prevent
+ *    the pump from rapidly turning on and off ("chattering"). The pump only
+ *    activates when the soil is sufficiently dry.
+ * 3. Fully Non-Blocking: All tasks—sensor reading, ThingSpeak uploads, LED
+ *    status, and pump control—are managed with millis(), allowing for
+ *    concurrent operation.
+ * 4. Configurable Timings: Pump 'on time', 'soak time', and hysteresis
+ *    thresholds are defined as constants for easy tuning.
  ********************************************************************************/
 
 // --- Libraries ---
@@ -69,12 +65,29 @@ const long sensorReadInterval = 5000;       // Read sensor every 5 seconds
 const long thingSpeakUploadInterval = 60000; // Upload to ThingSpeak every 60 seconds
 const long ledBlinkyInterval = 1000;  //led blinks in 1 second, with "red led => no wifi", "blue led => good wifi"
 
+// Pump turn-on time and soak time - need tuning for your own case
+const unsigned int pumpOnTime = 1000; // Pump ON time in milliseconds (1 second)
+const unsigned int pumpSoakTime = 20000; // Soak time in milliseconds (20 seconds)
+// Hysteresis upper and lower moisture threshold values - also need tuning for your own case
+const unsigned int upperMoistureThreshold = 35; // Upper threshold in %
+const unsigned int lowerMoistureThreshold = 30; // Lower threshold in %
+
 // --- Function Prototypes ---
 void connectWiFi();
 void readMoisture();
 void uploadToThingSpeak();
 void controlWaterPump();
 void ledBlinky();
+
+// --- Add these new global variables ---
+enum PumpState { IDLE, WATERING, SOAKING };
+PumpState currentPumpState = IDLE;
+unsigned long pumpStateChangeMillis = 0; // Tracks time for the current state
+
+// --- The new function to START the cycle ---
+void startWaterPumpCycle();
+// --- The function that MANAGES the cycle (called from the main loop) ---
+void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime);
 
 // ==============================================================================
 // SETUP: Runs once when the Arduino starts up
@@ -205,6 +218,19 @@ void uploadToThingSpeak() {
  */
 void controlWaterPump() {
   // This is where you would add the logic to control the pump.
+  if(currentMoisturePercent < lowerMoistureThreshold){
+    //Serial.println("Moisture below lower threshold. Starting watering cycle.");
+    startWaterPumpCycle();
+  } else if(currentMoisturePercent > upperMoistureThreshold){
+    Serial.println("Moisture above upper threshold. Too much water, need intervention.");
+  } else {
+    // do nothing, within hysteresis band
+  } 
+
+  // Manage the pump state on every single loop iteration
+  // The function will handle the timing and state changes internally.
+  // Use 1000ms for watering and 20000ms (30s) for soaking.
+  manageWaterPumpCycle(pumpOnTime, pumpSoakTime);  
 }
 
 /**
@@ -220,5 +246,45 @@ void ledBlinky() {
     // Blink Red LED
     digitalWrite(LED_BLUE_PIN, LOW); // Ensure BLUE is OFF
     digitalWrite(LED_RED_PIN, !digitalRead(LED_RED_PIN)); // Toggle RED LED
+  }
+}
+
+// --- The new function to START the cycle ---
+void startWaterPumpCycle() {
+  // Only start a new cycle if the pump is currently idle
+  if (currentPumpState == IDLE) {
+    currentPumpState = WATERING;
+    pumpStateChangeMillis = millis(); // Record the time we started watering
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    Serial.println("Pump cycle started: WATERING");
+  }
+}
+
+/**
+ * @brief Manages the water pump cycle using a state machine.
+ * @param onTime Duration for which the pump should be ON (in milliseconds).
+ * @param soakTime Duration for which the soil should soak after watering (in milliseconds).
+ */
+void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime) {
+  // This function is a state machine. It does nothing unless a state is active.
+  
+  // State 1: The pump is currently WATERING
+  if (currentPumpState == WATERING) {
+    // Check if the 'onTime' has elapsed
+    if (millis() - pumpStateChangeMillis >= onTime) {
+      // Time to switch to the SOAKING state
+      currentPumpState = SOAKING;
+      pumpStateChangeMillis = millis(); // Record the time we started soaking
+      digitalWrite(PUMP_RELAY_PIN, LOW);
+      Serial.println("Watering finished. Now SOAKING.");
+    }
+  }  // State 2: The soil is currently SOAKING
+  else if (currentPumpState == SOAKING) { 
+    // Check if the 'soakTime' has elapsed
+    if (millis() - pumpStateChangeMillis >= soakTime) {
+      // The cycle is complete, return to IDLE
+      currentPumpState = IDLE;
+      Serial.println("Soak time complete. Pump cycle finished.");
+    }
   }
 }

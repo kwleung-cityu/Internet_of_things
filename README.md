@@ -103,7 +103,7 @@ If you run into any issues, please check the troubleshooting guide for solutions
 ## 5. Advanced Challenges
 Finished the main project and want to take it to the next level? These optional guides will show you how to add more advanced features to your smart flowerpot.
 
-### [Challenge 1: Precision Watering with PID Control](./docs/5_Advanced_Challenges.md)
+### [Challenge 1: Porting to ESP32 / ESP32-S3 Wifi SoC]()
 
 
 
