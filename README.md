@@ -75,7 +75,9 @@ Analyze the data and send an alert to your smartphone if the moisture level gets
 
 Automatically activate a water pump to water the plant when needed, creating a fully automated system.
 
-<img src="./docs/images/readme_cover.jpg">
+
+
+<img src="./docs/images/Project_overview.svg">
 
 ___
 
@@ -103,7 +105,7 @@ If you run into any issues, please check the troubleshooting guide for solutions
 ## 5. Advanced Challenges
 Finished the main project and want to take it to the next level? These optional guides will show you how to add more advanced features to your smart flowerpot.
 
-### [Challenge 1: Porting to ESP32 / ESP32-S3 Wifi SoC]()
+### Challenge 1: Porting to ESP32 / ESP32-S3 Wifi SoC [TODO...]
 
 
 

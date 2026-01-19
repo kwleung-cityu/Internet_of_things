@@ -1,8 +1,12 @@
 # Hardware Setup
 
-The diagram below illustrates how the different components are connected using our custom lab kit.
+The diagram below illustrates how different components are connected using our custom lab kit.
 
-<img src = "./images/system_diagram.jpg">
+
+
+<img src = "./images/connection_diagram.svg">
+
+
 
 Here are some important notes about the connections:
 
@@ -37,19 +41,14 @@ Here are some important notes about the connections:
 
 **4. Connecting the Water Pump**
 
-- Connect **Relay 1/2 Input Pin** to one of the GPIO pins on the Arduino, such as **GPIO2**.
+- We are using a 3.7V water pump with the current requirement of ~0.5A which exceeds the safe current limit of a standard I/O pin (~20mA). Using a relay allows a low-power signal from the board to switch the higher current needed to run the pump.
 
-- Connect the **positive terminal of the water pump** to one of the **+5V power supply pins on P14**. 
+  - Connect **Relay 1 or 2 Input Pin** to one of the GPIO pins on the Arduino, such as **GPIO2**.
+  - Connect the **positive terminal of the water pump** to one of the **+3.3V power supply pins on P13**.
+  - Connect the **negative terminal of the water pump** to **N.O. pin of Relay 1 or 2**.
+  - Connect the **COM terminal of Relay 1 or 2 to GND**.
 
-- Connect the **negative terminal of the water pump** to **NO pin of Relay 1/2**.
-
-- Connect the **COM terminal of Relay 1/2 to GND**.
-
-- The water pump requires more power (5V at ~170mA) than an Arduino pin can safely provide (which is limited to ~20mA).
-
-- To control the pump, we must use a **relay module**. The relay acts as a high-power, electronically controlled switch.
-
-- The Arduino will send a simple on/off signal to the relay module. The relay, in turn, will switch the **+5V** power from the lab kit's DC-DC converter to turn the pump on and off.
+- The Arduino will send a simple on/off signal to the relay module. The relay, in turn, will switch the **+3.3V** power from the lab kit's DC-DC converter to turn the pump on and off.
 
   - For a detailed guide on how relays work and how to use them, please see
 
