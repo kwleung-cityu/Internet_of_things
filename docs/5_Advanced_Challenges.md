@@ -1,3 +1,0 @@
-# Advanced Challenge: Porting the application to ESP32S3
-
-TODO...
