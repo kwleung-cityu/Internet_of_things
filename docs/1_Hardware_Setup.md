@@ -4,7 +4,7 @@ The diagram below illustrates how different components are connected using our c
 
 
 
-<img src = "./images/connection_diagram.svg">
+<img src = "./images/connection_diagram.jpg">
 
 
 

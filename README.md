@@ -20,7 +20,7 @@ This can be any ordinary object you can think of: a flowerpot, your pet's food b
 
 **Step 2: Giving it "Senses" with Sensors**
 
-To know something about the world, our "Thing" needs senses. We add sensors to collect specific data.
+To know something about the world, our "Thing" needs senses. We add sensors to collect specific data, giving few examples below:
 *   A **moisture sensor** for the flowerpot's soil.
 *   A **level sensor** for the food bowl.
 *   A **magnetic sensor** for your door.
@@ -77,7 +77,7 @@ Automatically activate a water pump to water the plant when needed, creating a f
 
 
 
-<img src="./docs/images/Project_overview.svg">
+<img src="./docs/images/Project_overview.jpg">
 
 ___
 
