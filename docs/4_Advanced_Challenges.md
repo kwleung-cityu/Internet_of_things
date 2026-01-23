@@ -65,3 +65,7 @@ You will see a new COM port under ESP32S3 Dev Module.
 
 <img src = "./images/ch343_new_com.png">
 
+
+
+5. **Next step:** Proceed to [Challenge 1](../docs/4.1_Challenge1_Porting_to_ESP32S3.md) to port the project to this more powerful ESP32-S3 Wifi Soc 
+
