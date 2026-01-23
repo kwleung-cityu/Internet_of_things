@@ -51,8 +51,9 @@ const unsigned int moistureFieldNumber = 1;          // Field number for moistur
 
 // --- Global Variables ---
 WiFiEspClient thingspeakClient;
-int currentMoisturePercent = 0; // Holds the latest sensor reading
-bool isWifiModuleOK = false;    // Flag to track if the ESP8266 is responding
+int currentMoisturePercent = 100; // Holds the latest sensor reading
+                                  // initialize to 100% to avoid unintended water pump action on power up.
+bool isWifiModuleOK = false;      // Flag to track if the ESP8266 is responding
 
 // --- Timing Control (Non-Blocking) ---
 // Used to track time for various tasks without using delay()
@@ -222,7 +223,7 @@ void controlWaterPump() {
     //Serial.println("Moisture below lower threshold. Starting watering cycle.");
     startWaterPumpCycle();
   } else if(currentMoisturePercent > upperMoistureThreshold){
-    Serial.println("Moisture above upper threshold. Too much water, need intervention.");
+    //Serial.println("Moisture above upper threshold. Too much water, need intervention.");
   } else {
     // do nothing, within hysteresis band
   } 

@@ -100,10 +100,10 @@ This guide will walk you through setting up your ThingSpeak account, creating a 
 ### [Part 4: Advanced Challenges](./docs/4_Advanced_Challenges.md)
 
 Finished the main project and want to take it to the next level? These optional guides will show you how to add more advanced features to your smart flowerpot, such as:
-*   Porting the project to a more powerful ESP32 or ESP32-S3 microcontroller.
-*   Adding a camera to take pictures of your plant.
-*   Uploading the images to Google Drive.
-*   Implementing real-time remote control using MQTT.
+*   [Challenge 1: Porting the project to a more powerful ESP32-S3 Wifi SoC](./docs/4.1_Challenge1_Porting_to_ESP32S3.md).
+*   [Challenge 2: Adding a camera to take pictures of your plant.](./docs/4.1_Challenge2_Adding_camera_to_take_pictures.md)
+*   [Challenge 3: Uploading the images to Google Drive.](./docs/4.1_Challenge3_Uploading_the_images_to_GoogleDrive.md)
+*   [Challenge 4: Implementing real-time remote control using MQTT.](./docs/4.1_Challenge4_Using_MQTT_for_RemoteControl.md)
 
 
 

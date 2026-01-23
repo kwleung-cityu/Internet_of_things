@@ -1,4 +1,4 @@
-# Part 3: Cloud Configuration with ThingSpeak
+# Cloud Configuration with ThingSpeak
 
 ## What is the "Cloud"?
 

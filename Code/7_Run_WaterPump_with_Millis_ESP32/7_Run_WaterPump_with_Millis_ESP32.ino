@@ -1,45 +1,61 @@
 /********************************************************************************
- * File: 5_Run_WaterPump_with_Delay.ino
+ * File: 7_Run_WaterPump_with_Millis_ESP32.ino
  * 
  * Description:
- * This sketch demonstrates how to integrate a water pump into the IoT system
- * using a simple, but flawed, `delay()`-based approach. It serves as an
- * educational example to highlight the problems with blocking code in a
- * responsive system.
- * 
- * While the non-blocking `millis()` structure is used for sensor reading and
- * ThingSpeak uploads, the water pump control itself is handled by a function
- * that uses long, blocking `delay()` calls.
- * 
- * Key Features & Learning Points:
- * 1. Blocking Pump Control: The `runWaterPumpCycle_with_delay()` function
- *    completely halts the microcontroller's execution.
- * 2. Hysteresis Logic: It correctly uses a lower and upper moisture threshold
- *    to decide when to start the watering cycle.
- * 3. The "Delay" Problem: When the pump cycle runs, you will observe that
- *    the status LEDs stop blinking and the Serial Monitor provides no updates.
- *    This is because the main `loop()` is frozen, demonstrating why `delay()`
- *    is unsuitable for responsive, multi-tasking projects.
+ * This sketch is an advanced version of the Smart Flowerpot project, specifically
+ * upgraded to run on the Freenove ESP32-S3 WROOM board. It builds upon the
+ * previous non-blocking `millis()`-based timing system and integrates Wi-Fi
+ * connectivity for IoT data logging to ThingSpeak.
+ *
+ * Key Improvements with ESP32-S3:
+ * - Simplified Codebase: The ESP32-S3 has a built-in Wi-Fi module, which
+ *   eliminates the need for a separate ESP8266 and the complex serial
+ *   communication between two microcontrollers. This results in cleaner and
+ *   more straightforward code.
+ * - Simplified hardware connection because there is no ESP8266 required.
+ * - Redundant Variables Removed: Global variables like `isWifiModuleOK` are no
+ *   longer necessary. The Wi-Fi status can be checked directly using the
+ *   `WiFi.status()` function from the native WiFi library.
+ * - Robust Startup Behavior: The `currentMoisturePercent` global variable is
+ *   initialized to 100%. This prevents the water pump from unintentionally
+ *   activating when the device powers on, as the initial reading is considered
+ *   "wet" and above the watering threshold.
+ *
+ * Core Functionality:
+ * 1. Non-Blocking Operation: Uses `millis()` for all timing, ensuring the main
+ *    loop runs quickly and responsively.
+ * 2. Moisture Sensing: Periodically reads the soil moisture level.
+ * 3. ThingSpeak Integration: Uploads moisture data to a ThingSpeak channel at
+ *    a regular interval.
+ * 4. Automated Watering Cycle: Implements a state machine (`IDLE`, `WATERING`,
+ *    `SOAKING`) to control the water pump.
+ *    - It uses hysteresis (upper and lower moisture thresholds) to prevent
+ *      rapid on/off cycling of the pump.
+ *    - When moisture drops below the lower threshold, it runs the pump for a
+ *      defined period (`pumpOnTime`) and then waits for a `pumpSoakTime`
+ *      before returning to idle, allowing the water to be absorbed.
+ * 5. Status Indicator: A dual-color LED provides visual feedback on the Wi-Fi
+ *    connection status (Red for disconnected, Blue for connected).
  ********************************************************************************/
 
 // --- Libraries ---
+#include <WiFi.h>
 #include "ThingSpeak.h"
-#include "WiFiEsp.h"
 
 // --- Hardware Pin Definitions ---
-#define SENSOR_PIN A0 
-#define PUMP_RELAY_PIN  2
-#define LED_RED_PIN     3
-#define LED_BLUE_PIN    4
+#define SENSOR_PIN        1     //ESP32-S3 GPIO 1 (ADC1_CH0) for the moisture sensor
+#define PUMP_RELAY_PIN    38    //ESP32-S3 GPIO 38 to control the water pump relay  
+#define LED_RED_PIN       41
+#define LED_BLUE_PIN      42
 
 // --- Sensor Calibration ---
 // Replace these with the values you found in the calibration step
-const int DRY_VALUE = 680; // Raw ADC value for 0% moisture (in air)
-const int WET_VALUE = 250; // Raw ADC value for 100% moisture (in water)
+const int DRY_VALUE = 4095; // Raw ADC value for 0% moisture (in air)
+const int WET_VALUE = 1300; // Raw ADC value for 100% moisture (in water)
 
 // --- Wi-Fi & ThingSpeak Configuration ---
-#define ESP_BAUDRATE 115200
 #define SERIAL_MON_BAUDRATE 115200
+
 char ssid[] = "YOUR_SSID";     // Your network SSID (name)
 char pass[] = "YOUR_PASSWORD"; // Your network password
 
@@ -48,10 +64,9 @@ const char *myWriteAPIKey = "channel_write_apikey";  // Your ThingSpeak Write AP
 const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
 
 // --- Global Variables ---
-WiFiEspClient thingspeakClient;
-int currentMoisturePercent = 100; // Holds the latest sensor reading
+WiFiClient thingspeakClient;
+int currentMoisturePercent = 100; // Holds the latest sensor reading.
                                   // initialize to 100% to avoid unintended water pump action on power up.
-bool isWifiModuleOK = false;      // Flag to track if the ESP8266 is responding
 
 // --- Timing Control (Non-Blocking) ---
 // Used to track time for various tasks without using delay()
@@ -76,15 +91,23 @@ void connectWiFi();
 void readMoisture();
 void uploadToThingSpeak();
 void controlWaterPump();
-void runWaterPumpCycle_with_delay(unsigned int onTime, unsigned int soakTime);
 void ledBlinky();
+
+// --- Add these new global variables ---
+enum PumpState { IDLE, WATERING, SOAKING };
+PumpState currentPumpState = IDLE;
+unsigned long pumpStateChangeMillis = 0; // Tracks time for the current state
+
+// --- The new function to START the cycle ---
+void startWaterPumpCycle();
+// --- The function that MANAGES the cycle (called from the main loop) ---
+void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime);
 
 // ==============================================================================
 // SETUP: Runs once when the Arduino starts up
 // ==============================================================================
 void setup() {
   Serial.begin(SERIAL_MON_BAUDRATE);
-  Serial1.begin(ESP_BAUDRATE); // Initialize Serial1 for ESP8266 modem
   delay(500); //a short delay to let Serial port settle
     
   pinMode(PUMP_RELAY_PIN, OUTPUT);
@@ -94,21 +117,7 @@ void setup() {
   digitalWrite(LED_RED_PIN, LOW); //turn off RED and BLUE LEDs to start with
   digitalWrite(LED_BLUE_PIN, LOW);
 
-  WiFi.init(&Serial1);
-  
-  // Check if the WiFi module is responding.
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("******************************************************");
-    Serial.println("ERROR: ESP8266 WiFi module not detected or not responding.");
-    Serial.println(" - Check wiring between Mega and ESP8266.");
-    Serial.println(" - Ensure ESP8266 has sufficient power.");
-    Serial.println(" - The program will continue to run without WiFi.");
-    Serial.println("******************************************************");
-    isWifiModuleOK = false; // Set flag to prevent further WiFi attempts
-  } else {
-    Serial.println("WiFi module detected.");
-    isWifiModuleOK = true; // WiFi module is OK
-  }
+  connectWiFi();
 
   ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
 }
@@ -131,16 +140,14 @@ void loop() {
     previousThingSpeakUploadMillis = currentMillis; // Save the time of this attempt
     
     // Only proceed if the WiFi module was detected at startup
-    if (isWifiModuleOK) {
-      // If not connected, try to connect now.
-      if (WiFi.status() != WL_CONNECTED) {
-        connectWiFi(); 
-      }
-      
-      // After the connection attempt, check again before uploading.
-      if (WiFi.status() == WL_CONNECTED) {
-        uploadToThingSpeak();
-      }
+    // If not connected, try to connect now.
+    if (WiFi.status() != WL_CONNECTED) {
+      connectWiFi(); 
+    }
+    
+    // After the connection attempt, check again before uploading.
+    if (WiFi.status() == WL_CONNECTED) {
+      uploadToThingSpeak();
     }
   }
 
@@ -209,13 +216,18 @@ void uploadToThingSpeak() {
 void controlWaterPump() {
   // This is where you would add the logic to control the pump.
   if(currentMoisturePercent < lowerMoistureThreshold){
-    Serial.println("Moisture below lower threshold. Starting watering cycle.");
-    runWaterPumpCycle_with_delay(pumpOnTime, pumpSoakTime);
+    //Serial.println("Moisture below lower threshold. Starting watering cycle.");
+    startWaterPumpCycle();
   } else if(currentMoisturePercent > upperMoistureThreshold){
     //Serial.println("Moisture above upper threshold. Too much water, need intervention.");
   } else {
     // do nothing, within hysteresis band
   } 
+
+  // Manage the pump state on every single loop iteration
+  // The function will handle the timing and state changes internally.
+  // Use 1000ms for watering and 20000ms (30s) for soaking.
+  manageWaterPumpCycle(pumpOnTime, pumpSoakTime);  
 }
 
 /**
@@ -223,7 +235,7 @@ void controlWaterPump() {
  * Red LED indicates no WiFi connection. Blue LED indicates good WiFi connection.
  */
 void ledBlinky() {
-  if(isWifiModuleOK && WiFi.status() == WL_CONNECTED){
+  if(WiFi.status() == WL_CONNECTED){
     // Blink Blue LED
     digitalWrite(LED_RED_PIN, LOW); // Ensure RED is OFF
     digitalWrite(LED_BLUE_PIN, !digitalRead(LED_BLUE_PIN)); // Toggle BLUE LED
@@ -234,29 +246,42 @@ void ledBlinky() {
   }
 }
 
+// --- The new function to START the cycle ---
+void startWaterPumpCycle() {
+  // Only start a new cycle if the pump is currently idle
+  if (currentPumpState == IDLE) {
+    currentPumpState = WATERING;
+    pumpStateChangeMillis = millis(); // Record the time we started watering
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    Serial.println("Pump cycle started: WATERING");
+  }
+}
+
 /**
- * * 
- * @brief Runs a water pump cycle with blocking delays.
- * @param onTime Duration (in milliseconds) to keep the pump ON.
- * @param soakTime Duration (in milliseconds) to wait after turning the pump OFF.
- * NOTE: This function uses blocking delay() calls, which will pause the main loop.
+ * @brief Manages the water pump cycle using a state machine.
+ * @param onTime Duration for which the pump should be ON (in milliseconds).
+ * @param soakTime Duration for which the soil should soak after watering (in milliseconds).
  */
-void runWaterPumpCycle_with_delay(unsigned int onTime, unsigned int soakTime) {
-  // 1. Turn the water pump ON
-  digitalWrite(PUMP_RELAY_PIN, HIGH);
-  Serial.println("Pump ON");
-
-  // 2. Wait for the specified 'onTime' duration.
-  //    !!! This is a BLOCKING call. The MCU can do nothing else. !!!
-  delay(onTime);
-
-  // 3. Turn the water pump OFF
-  digitalWrite(PUMP_RELAY_PIN, LOW);
-  Serial.println("Pump OFF");
-
-  // 4. Wait for the 'soakTime' to allow water to absorb.
-  //    !!! This is also a BLOCKING call. !!!
-  Serial.println("Program trapped in delay(soakTime). You won't see LED blinking!");
-  delay(soakTime);
-  Serial.println("Soak time complete. Cycle finished.");
+void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime) {
+  // This function is a state machine. It does nothing unless a state is active.
+  
+  // State 1: The pump is currently WATERING
+  if (currentPumpState == WATERING) {
+    // Check if the 'onTime' has elapsed
+    if (millis() - pumpStateChangeMillis >= onTime) {
+      // Time to switch to the SOAKING state
+      currentPumpState = SOAKING;
+      pumpStateChangeMillis = millis(); // Record the time we started soaking
+      digitalWrite(PUMP_RELAY_PIN, LOW);
+      Serial.println("Watering finished. Now SOAKING.");
+    }
+  }  // State 2: The soil is currently SOAKING
+  else if (currentPumpState == SOAKING) { 
+    // Check if the 'soakTime' has elapsed
+    if (millis() - pumpStateChangeMillis >= soakTime) {
+      // The cycle is complete, return to IDLE
+      currentPumpState = IDLE;
+      Serial.println("Soak time complete. Pump cycle finished.");
+    }
+  }
 }
