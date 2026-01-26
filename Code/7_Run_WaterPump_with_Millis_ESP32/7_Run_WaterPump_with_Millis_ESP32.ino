@@ -114,7 +114,14 @@ void setup() {
   digitalWrite(LED_BLUE_PIN, LOW);
 
   connectWiFi();
-
+  if (WiFi.status() == WL_NO_SHIELD) {
+    Serial.println("******************************************************");
+    Serial.println("ERROR: ESP32 WiFi module not detected or not responding.");
+    Serial.println(" - The program will continue to run without WiFi.");
+    Serial.println("******************************************************");
+  } else {
+    Serial.println("WiFi is connected.");
+  }
   ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
 }
 
