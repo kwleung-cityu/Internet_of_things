@@ -16,10 +16,6 @@
  * - Redundant Variables Removed: Global variables like `isWifiModuleOK` are no
  *   longer necessary. The Wi-Fi status can be checked directly using the
  *   `WiFi.status()` function from the native WiFi library.
- * - Robust Startup Behavior: The `currentMoisturePercent` global variable is
- *   initialized to 100%. This prevents the water pump from unintentionally
- *   activating when the device powers on, as the initial reading is considered
- *   "wet" and above the watering threshold.
  *
  * Core Functionality:
  * 1. Non-Blocking Operation: Uses `millis()` for all timing, ensuring the main
