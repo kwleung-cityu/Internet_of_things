@@ -114,9 +114,10 @@ void setup() {
   digitalWrite(LED_BLUE_PIN, LOW);
 
   connectWiFi();
-  if (WiFi.status() == WL_NO_SHIELD) {
+  delay(500); //a short delay to allow WiFi connection
+  if (WiFi.status() != WL_CONNECTED) {
     Serial.println("******************************************************");
-    Serial.println("ERROR: ESP32 WiFi module not detected or not responding.");
+    Serial.println("ERROR: ESP32 is not connected to the WiFi router");
     Serial.println(" - The program will continue to run without WiFi.");
     Serial.println("******************************************************");
   } else {
