@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../Personal/EE3070/SmartPetHouse/Freenove_ESP32_S3_WROOM_Board-main/C/Sketches/Sketch_07.3_Camera_SDcard"
+		},
+		{
+			"path": "../../../Personal/EE3070/SmartPetHouse/Freenove_ESP32_S3_WROOM_Board-main/C/Sketches/Sketch_07.1_CameraWebServer"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../Internet_of_things"
+		}
+	]
+}
