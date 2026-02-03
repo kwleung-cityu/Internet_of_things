@@ -17,6 +17,7 @@
 //because camera_index.h is included in both app_httpd.cpp and esp_camera.h which boosts
 //the Flash usage size beyond the limit of 8MB in ESP32-S3 CAM module
 
+#include "app_httpd.h"
 #include "esp_http_server.h"
 #include "esp_timer.h"
 #include "esp_camera.h"
@@ -27,7 +28,7 @@
 #include "sdkconfig.h"
 
 #include "Arduino.h"
-#include "sd_read_write.h"
+//#include "sd_read_write.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -222,6 +223,7 @@ static esp_err_t parse_get(httpd_req_t *req, char **obuf)
     httpd_resp_send_404(req);
     return ESP_FAIL;
 }
+
 const char index_web[]=R"rawliteral(
 <html>
   <head>
@@ -261,6 +263,7 @@ static esp_err_t index_handler(httpd_req_t *req)
   return err;
 }
 
+#ifdef USE_SD_MMC
 static esp_err_t button_handler(httpd_req_t *req)
 {
   esp_err_t err;
@@ -283,6 +286,7 @@ static esp_err_t button_handler(httpd_req_t *req)
   }
   return err;
 }
+#endif
 
 void startCameraServer()
 {
@@ -300,20 +304,24 @@ void startCameraServer()
         .method = HTTP_GET,
         .handler = stream_handler,
         .user_ctx = NULL}; 
-    
+
+#ifdef USE_SD_MMC   
     httpd_uri_t button_uri = {
         .uri = "/button",
         .method = HTTP_POST,
         .handler = button_handler,
         .user_ctx = NULL}; 
+#endif
 
     ra_filter_init(&ra_filter, 20);
 
     ESP_LOGI(TAG, "Starting web server on port: '%d'", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
-        httpd_register_uri_handler(camera_httpd, &index_uri);        
+        httpd_register_uri_handler(camera_httpd, &index_uri);     
+#ifdef USE_SD_MMC   
         httpd_register_uri_handler(camera_httpd, &button_uri);
+#endif
         // httpd_register_uri_handler(camera_httpd, &stream_uri);
     }
 
@@ -325,18 +333,4 @@ void startCameraServer()
         httpd_register_uri_handler(stream_httpd, &stream_uri);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// End of file

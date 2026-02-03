@@ -40,7 +40,7 @@
 
 // --- Hardware Pin Definitions ---
 #define SENSOR_PIN        1     //ESP32-S3 GPIO 1 (ADC1_CH0) for the moisture sensor
-#define PUMP_RELAY_PIN    38    //ESP32-S3 GPIO 38 to control the water pump relay  
+#define PUMP_RELAY_PIN    47    //ESP32-S3 GPIO 47 to control the water pump relay  
 #define LED_RED_PIN       41
 #define LED_BLUE_PIN      42
 

@@ -35,8 +35,8 @@ The most latest ESP32 core version is currently version 3.0.7 if you require the
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char* ssid     = "REPLACE_WITH_YOUR_SSID";      //input your wifi name
-const char* password = "REPLACE_WITH_YOUR_PASSWORD";  //input your wifi passwords
+const char* ssid     = "YOUR_WIFI_SSID";      //input your wifi name
+const char* password = "YOUR_WIFI_PASSWORD";  //input your wifi passwords
 
 void startCameraServer();
 
