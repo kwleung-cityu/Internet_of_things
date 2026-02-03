@@ -16,13 +16,12 @@ byte button_state = BUTTON_UP;
 // ==================================
 //    Enter your WiFi credentials
 // ==================================
-const char* ssid     = "EE3070_P1615_1";
-const char* password = "EE3070P1615";
+const char* ssid     = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
 const String writeApiKey  = "YOUR_THINGSPEAK_API_KEY"; // Replace with your ThingSpeak API key
 const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
-const String webAppUrl = "https://script.google.com/macros/s/AKfycbyMkCBc8x8SZBUH-GZuy1pdONclqY3SbD5z1dfsIiS4-FVaUFYEY1gxYiEb2Yh9P7n4cw/exec"; 
-
+const String webAppUrl = "https://script.google.com/macros/s/<YOUR_DEPLOYMENT_ID>/exec"; 
 
 void setup() {
   Serial.begin(115200);
