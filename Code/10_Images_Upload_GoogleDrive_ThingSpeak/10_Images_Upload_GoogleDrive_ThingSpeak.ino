@@ -18,7 +18,7 @@ byte button_state = BUTTON_UP;
 // ==================================
 const char* ssid     = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
-const String writeApiKey  = "YOUR_THINGSPEAK_API_KEY"; // Replace with your ThingSpeak API key
+const String writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
 const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
 const String webAppUrl = "https://script.google.com/macros/s/<YOUR_DEPLOYMENT_ID>/exec"; 
