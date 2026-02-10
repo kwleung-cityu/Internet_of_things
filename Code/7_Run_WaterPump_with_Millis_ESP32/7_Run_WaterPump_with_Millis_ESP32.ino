@@ -230,7 +230,7 @@ void controlWaterPump() {
 
   // Manage the pump state on every single loop iteration
   // The function will handle the timing and state changes internally.
-  // Use 1000ms for watering and 20000ms (30s) for soaking.
+  // Use 1000ms for watering and 20000ms (20s) for soaking.
   manageWaterPumpCycle(pumpOnTime, pumpSoakTime);  
 }
 

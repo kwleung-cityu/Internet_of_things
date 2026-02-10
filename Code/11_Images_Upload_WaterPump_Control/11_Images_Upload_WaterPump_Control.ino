@@ -5,12 +5,12 @@
 
 #include "google_drive.h"
 #include "thingspeak.h"
+#include "water_pump_control.h"
 
 #define BUTTON_PIN  0
 // A simple state machine for button press handling
 enum {BUTTON_UP, BUTTON_DEBOUNCE, BUTTON_DOWN, BUTTON_HOLD};
 byte button_state = BUTTON_UP;
-
 
 // ... WiFi and camera setup code ...
 // ==================================
@@ -22,6 +22,9 @@ const String writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with you
 const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
 const String webAppUrl = "https://script.google.com/macros/s/<YOUR_DEPLOYMENT_ID>/exec"; 
+
+// Local function prototypes
+void connectWiFi();
 
 void setup() {
   Serial.begin(115200);
@@ -43,30 +46,14 @@ void setup() {
     Serial.println("Error: Check your camera setup");
     return;
   }
-
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-
-  startCameraServer();
-
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
-
-  Serial.println("Press IO0 button on ESP32-S3 to capture an image, or");
-  Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");
+  
+  InitWaterPump();
 }
 
 framesize_t size;
 byte quality;
-bool camera_shutter_trigger;
+bool camera_shutter_trigger = false;
+bool water_pump_trigger = false;
 
 void loop() {
 
@@ -95,8 +82,9 @@ void loop() {
     button_state = BUTTON_UP;
   }
 
+
    // Handle serial input for size and quality
-  if(Serial.available()){
+  if( Serial.available() ) {
       String inputString = Serial.readStringUntil('\n');
       int spaceIndex = inputString.indexOf(' ');
       if (spaceIndex != -1) {
@@ -132,25 +120,58 @@ void loop() {
         }
         #endif
 
-		    String driveResponse;
-        if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
-            Serial.println("Upload successful!");
-            Serial.println("Google Drive response: " + driveResponse);
-            uploadUrlToThingSpeak(driveResponse, writeApiKey, thingSpeakFieldNumber);
-        } else {
-            Serial.println("Upload failed!");
+        if(WiFi.status() != WL_CONNECTED){
+          Serial.println("WiFi disconnected. Attempting to reconnect...");
+          connectWiFi();
         }
-        
+
+        if(WiFi.status() == WL_CONNECTED){
+          String driveResponse;
+          if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
+              Serial.println("Upload successful!");
+              Serial.println("Google Drive response: " + driveResponse);
+              uploadUrlToThingSpeak(driveResponse, writeApiKey, thingSpeakFieldNumber);
+          } else {
+              Serial.println("Upload failed!");
+          }
+        } 
         cameraFrameBufferTrash(fb);
     } else {
         Serial.println("Camera capture failed.");
     }
 
     camera_shutter_trigger = false;
+    water_pump_trigger = true; // Trigger the water pump cycle after capturing the image
     Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");
   }
   
+  if(water_pump_trigger){
+    startWaterPumpCycle();
+    water_pump_trigger = false;
+  }
+
+  controlWaterPump(); // Call this in every loop iteration to manage the pump state and timing
+  
   delay(10);
+}
+
+void connectWiFi() {
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+
+  delay(500);  // Add a delay to allow the WiFi connection process to start
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("");
+    Serial.println("WiFi connected! Use 'http://");
+    Serial.print(WiFi.localIP());
+    Serial.println("' to connect");
+    Serial.println("Press IO0 button on ESP32-S3 to capture an image, or");
+    Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");
+    startCameraServer();
+  } else {
+    Serial.println("");
+    Serial.println("WiFi connection failed");
+  }
 }
 
 
