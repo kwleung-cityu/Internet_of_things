@@ -97,7 +97,7 @@ Here, we will set up the Arduino IDE and write the code for our microcontroller 
 
 This guide will walk you through setting up your ThingSpeak account, creating a channel to receive data, and configuring the service to send alerts to your phone.
 
-### [Part 4: Advanced Challenges](./docs/4_Advanced_Challenges.md)
+### [Part 4: Advanced Challenges](./docs/4.0_Advanced_Challenges.md)
 
 Finished the main project and want to take it to the next level? These optional guides will show you how to add more advanced features to your smart flowerpot, such as:
 *   [Challenge 1: Porting the project to a more powerful ESP32-S3 Wifi SoC](./docs/4.1_Challenge1_Porting_to_ESP32S3.md).
