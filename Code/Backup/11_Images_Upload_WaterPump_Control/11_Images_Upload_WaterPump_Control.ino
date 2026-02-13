@@ -1,23 +1,34 @@
-
 #include <WiFi.h>
 #include "camera_api.h"
 #include "app_httpd.h"
 
 #include "google_drive.h"
 #include "thingspeak.h"
+#include "Sensor.h"
+#include "led_blinky.h"
 #include "water_pump_control.h"
 
-#define BUTTON_PIN  0
+#define SENSOR_PIN        1
+#define LED_RED_PIN       41
+#define LED_BLUE_PIN      42
+#define BUTTON_PIN        0
+
 // A simple state machine for button press handling
 enum {BUTTON_UP, BUTTON_DEBOUNCE, BUTTON_DOWN, BUTTON_HOLD};
 byte button_state = BUTTON_UP;
+
+Sensor soilSensor(SENSOR_PIN);
+LedBlinky ledRed(LED_RED_PIN);
+LedBlinky ledBlue(LED_BLUE_PIN, 1000); // Blue LED blinks every 1 second to indicate WiFi connection status
+
+bool wasWifiConnected = false;
 
 // ... WiFi and camera setup code ...
 // ==================================
 //    Enter your WiFi credentials
 // ==================================
-const char* ssid     = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid     = "EE3070_P1615_1";
+const char* password = "EE3070P1615";
 const String writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
 const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
@@ -46,7 +57,17 @@ void setup() {
     Serial.println("Error: Check your camera setup");
     return;
   }
+
+  connectWiFi();
   
+  if (WiFi.status() == WL_CONNECTED) {
+    ledBlue.start();  // Start blinking blue LED to indicate WiFi connection
+    wasWifiConnected = true;
+  } else {
+    ledRed.start();   // Start blinking red LED to indicate WiFi connection failure
+    wasWifiConnected = false;
+  }
+
   InitWaterPump();
 }
 
@@ -82,7 +103,6 @@ void loop() {
     button_state = BUTTON_UP;
   }
 
-
    // Handle serial input for size and quality
   if( Serial.available() ) {
       String inputString = Serial.readStringUntil('\n');
@@ -106,6 +126,7 @@ void loop() {
       }
   }
 
+  // If the camera shutter is triggered, capture an image and handle the upload process
   if( camera_shutter_trigger ) {
     camera_fb_t * fb = NULL;
     fb = cameraSnapShot(size, quality);
@@ -141,25 +162,54 @@ void loop() {
     }
 
     camera_shutter_trigger = false;
-    water_pump_trigger = true; // Trigger the water pump cycle after capturing the image
     Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");
   }
   
+  // Read soil moisture and control water pump
+  soilSensor.readMoisture();
+
+  // If moisture is low, trigger the water pump cycle
+  if(soilSensor.isMoistureLow()){
+    water_pump_trigger = true;
+  }
+
+  // If the water pump is triggered, start the water pump cycle
   if(water_pump_trigger){
     startWaterPumpCycle();
     water_pump_trigger = false;
   }
 
-  controlWaterPump(); // Call this in every loop iteration to manage the pump state and timing
+  // Control the water pump based on the current soil moisture level
+  controlWaterPump();
   
+  // Check WiFi connection status and update LED indicators accordingly
+  bool isWifiConnected = (WiFi.status() == WL_CONNECTED);
+  if (isWifiConnected != wasWifiConnected) {
+    if (isWifiConnected) {
+      ledRed.stop();
+      ledBlue.start();
+      Serial.println("WiFi reconnected. Blue LED started.");
+    } else {
+      ledBlue.stop();
+      ledRed.start();
+      Serial.println("WiFi disconnected. Red LED started.");
+    }
+    wasWifiConnected = isWifiConnected;
+  }
+
+  // Update LED states by calling their update methods
+  ledBlue.update();
+  ledRed.update();
+
   delay(10);
 }
 
+// Function to connect to WiFi and start the camera server
 void connectWiFi() {
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
-  delay(500);  // Add a delay to allow the WiFi connection process to start
+  //delay(500);  // Add a delay to allow the WiFi connection process to start
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("");
     Serial.println("WiFi connected! Use 'http://");

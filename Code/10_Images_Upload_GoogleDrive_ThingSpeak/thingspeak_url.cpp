@@ -1,4 +1,4 @@
-#include "thingspeak.h"
+#include "thingspeak_url.h"
 #include <HTTPClient.h>
 
 // URL encode function to handle special characters

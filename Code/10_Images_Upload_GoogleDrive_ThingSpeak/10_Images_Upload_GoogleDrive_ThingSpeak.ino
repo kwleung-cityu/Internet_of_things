@@ -4,7 +4,7 @@
 #include "app_httpd.h"
 
 #include "google_drive.h"
-#include "thingspeak.h"
+#include "thingspeak_url.h"
 
 #define BUTTON_PIN  0
 // A simple state machine for button press handling
