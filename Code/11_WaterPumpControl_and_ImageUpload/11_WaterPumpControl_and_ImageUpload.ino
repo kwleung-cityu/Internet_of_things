@@ -24,16 +24,16 @@ const int WET_VALUE = 1300; // Raw ADC value for 100% moisture (in water)
 // --- Wi-Fi & ThingSpeak Configuration ---
 #define SERIAL_MON_BAUDRATE 115200
 
-char ssid[] = "YOUR_SSID";     // Your network SSID (name)
-char pass[] = "YOUR_PASSWORD"; // Your network password
+const char* ssid = "YOUR_WIFI_SSID";     // Your network SSID (name)
+const char* pass = "YOUR_WIFI_PASSWORD"; // Your network password
 
 const unsigned long myChannelNumber = 123456;        // Your ThingSpeak channel number
-const char *myWriteAPIKey = "channel_write_apikey";  // Your ThingSpeak Write API Key
+const char *writeApiKey = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
 const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
-const String writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
-const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
+
+const uint8_t urlFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
-const String webAppUrl = "https://script.google.com/macros/s/<YOUR_DEPLOYMENT_ID>/exec"; 
+const String webAppUrl = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; 
 
 // --- Global Variables ---
 WiFiClient thingspeakClient;
@@ -204,7 +204,7 @@ void uploadToThingSpeak() {
   Serial.println("Uploading data to ThingSpeak...");
   ThingSpeak.setField(moistureFieldNumber, currentMoisturePercent);
 
-  int httpCode = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  int httpCode = ThingSpeak.writeFields(myChannelNumber, writeApiKey);
 
   if (httpCode == 200) {
     Serial.println("ThingSpeak upload successful.");
@@ -311,7 +311,7 @@ void SnapShotImageUpload()
         if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
             Serial.println("Upload successful!");
             Serial.println("Google Drive response: " + driveResponse);
-            uploadUrlToThingSpeak(driveResponse, writeApiKey, thingSpeakFieldNumber);
+            uploadUrlToThingSpeak(driveResponse, String(writeApiKey), urlFieldNumber);
         } else {
             Serial.println("Upload failed!");
         }
@@ -320,5 +320,4 @@ void SnapShotImageUpload()
     } else {
         Serial.println("Camera capture failed.");
     }
-    Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");  
 }

@@ -18,10 +18,10 @@ byte button_state = BUTTON_UP;
 // ==================================
 const char* ssid     = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
-const String writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
+const char* writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
 const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
-const String webAppUrl = "https://script.google.com/macros/s/<YOUR_DEPLOYMENT_ID>/exec"; 
+const String webAppUrl = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; 
 
 void setup() {
   Serial.begin(115200);
@@ -136,7 +136,7 @@ void loop() {
         if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
             Serial.println("Upload successful!");
             Serial.println("Google Drive response: " + driveResponse);
-            uploadUrlToThingSpeak(driveResponse, writeApiKey, thingSpeakFieldNumber);
+            uploadUrlToThingSpeak(driveResponse, String(writeApiKey), thingSpeakFieldNumber);
         } else {
             Serial.println("Upload failed!");
         }
