@@ -27,7 +27,7 @@ const int WET_VALUE = 1300; // Raw ADC value for 100% moisture (in water)
 const char* ssid = "YOUR_WIFI_SSID";     // Your network SSID (name)
 const char* pass = "YOUR_WIFI_PASSWORD"; // Your network password
 
-const unsigned long myChannelNumber = 123456;        // Your ThingSpeak channel number
+const unsigned long myChannelID = 123456;        // Your ThingSpeak channel number
 const char *writeApiKey = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
 const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
 
@@ -36,6 +36,7 @@ const uint8_t urlFieldNumber = 2; // Field number to upload the URL to
 const String webAppUrl = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; 
 
 // --- Global Variables ---
+String lastImageUrl = ""; // To store the last uploaded image URL
 WiFiClient thingspeakClient;
 int currentMoisturePercent = 100; // Holds the latest sensor reading.
                                   // initialize to 100% to avoid unintended water pump action on power up.
@@ -204,10 +205,19 @@ void uploadToThingSpeak() {
   Serial.println("Uploading data to ThingSpeak...");
   ThingSpeak.setField(moistureFieldNumber, currentMoisturePercent);
 
-  int httpCode = ThingSpeak.writeFields(myChannelNumber, writeApiKey);
+  // If there's a new image URL, add it to the upload
+  if (lastImageUrl != "") {
+    ThingSpeak.setField(urlFieldNumber, lastImageUrl);
+  }
+
+  int httpCode = ThingSpeak.writeFields(myChannelID, writeApiKey);
 
   if (httpCode == 200) {
     Serial.println("ThingSpeak upload successful.");
+    // Clear the URL after a successful upload
+    if (lastImageUrl != "") {
+      lastImageUrl = ""; 
+    }
   } else {
     Serial.println("Problem uploading to ThingSpeak. HTTP error code " + String(httpCode));
   }
@@ -307,11 +317,11 @@ void SnapShotImageUpload()
         }
         #endif
 
-		    String driveResponse;
+        String driveResponse;
         if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
             Serial.println("Upload successful!");
             Serial.println("Google Drive response: " + driveResponse);
-            uploadUrlToThingSpeak(driveResponse, String(writeApiKey), urlFieldNumber);
+            lastImageUrl = driveResponse; // Store the URL
         } else {
             Serial.println("Upload failed!");
         }

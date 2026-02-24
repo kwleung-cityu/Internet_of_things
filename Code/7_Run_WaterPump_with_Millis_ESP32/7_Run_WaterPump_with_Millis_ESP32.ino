@@ -55,7 +55,7 @@ const int WET_VALUE = 1300; // Raw ADC value for 100% moisture (in water)
 const char* ssid = "YOUR_WIFI_SSID";     // Your network SSID (name)
 const char* pass = "YOUR_WIFI_PASSWORD"; // Your network password
 
-const unsigned long myChannelNumber = 123456;        // Your ThingSpeak channel number
+const unsigned long myChannelID = 123456;        // Your ThingSpeak channel number
 const char *writeApiKey = "YOUR_THINGSPEAK_API_WRITE_KEY";  // Your ThingSpeak Write API Key
 const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
 
@@ -205,7 +205,7 @@ void uploadToThingSpeak() {
   Serial.println("Uploading data to ThingSpeak...");
   ThingSpeak.setField(moistureFieldNumber, currentMoisturePercent);
 
-  int httpCode = ThingSpeak.writeFields(myChannelNumber, writeApiKey);
+  int httpCode = ThingSpeak.writeFields(myChannelID, writeApiKey);
 
   if (httpCode == 200) {
     Serial.println("ThingSpeak upload successful.");
