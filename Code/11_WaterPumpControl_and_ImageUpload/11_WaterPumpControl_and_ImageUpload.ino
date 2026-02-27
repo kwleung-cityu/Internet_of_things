@@ -52,6 +52,19 @@
  * - If Google Drive image is not viewable, check sharing permissions (must be public or anyone with link).
  * - For custom libraries (camera_api.h, google_drive.h), see project documentation for installation and usage.
  */
+ 
+// Revisions
+// February 27, 2026 -
+// Revise the code structure to make it more modular and easier to read, especially in the main loop.
+// 1. Encapsulated the image capture and Google Drive upload logic into a new function imageCaptureGoogleDriveUploadAndGetUrl() that 
+//    handles both the camera capture and the Google Drive upload steps, and returns the URL of the uploaded image if successful, or an empty string if it fails. 
+//    This makes the main loop cleaner and allows for better error handling when the image upload fails. 
+// 2. Updated the ThingSpeak upload logic to use a single function thingspeakChannelsUpdateWithUrl() that takes both the moisture value and the image URL as parameters,
+//    and uploads them together in a single HTTP request using ThingSpeak.setField() for both fields. 
+//    That is to synchronize the moisture value and the image URL in the same upload, instead of making a separate HTTP request to update the URL after uploading the moisture value.
+//    This is more efficient than making separate requests for the moisture value and the image URL, and ensures that the data is uploaded together consistently.
+// 3. Removed the files thingspeak_url.cpp and thingspeak_url.h since the URL upload is now integrated into the main ThingSpeak upload function, 
+//    simplifying the codebase and reducing the number of files to manage.
 
 // --- Libraries ---
 #include <WiFi.h>

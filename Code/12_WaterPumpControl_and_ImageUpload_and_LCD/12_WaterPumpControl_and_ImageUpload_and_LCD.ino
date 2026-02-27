@@ -1,7 +1,7 @@
 /**
  * 12_WaterPumpControl_and_ImageUpload_and_LCD.ino
  *
- * Demo sketch for ESP32-based smart irrigation system with integrated LCD display (LovyanGFX/ST7789), moisture sensor, water pump relay, camera, and cloud upload.
+ * Based on demo `11_WaterPumpControl_and_ImageDemoUpload.ino`, this sketch is enhanced with an LCD display (LovyanGFX/ST7789) to display the moisture value.
  *
  * High-Level Flow:
  * 1. Periodically read soil moisture sensor.
@@ -42,18 +42,13 @@
  * - lcdMoistureUpdate() updates moisture value on LCD
  *
  * Author: John Leung
- * Date: February 26, 2026
+ * Date: February 27, 2026
  *
  * -----------------------------------------------------------------------------
  * Main Loop Tasks:
  * 1. Periodically read moisture sensor, update LCD, capture/upload image, and update ThingSpeak.
  * 2. Manage water pump state machine.
  * 3. Blink LED for WiFi status.
- *
- * -----------------------------------------------------------------------------
- * URL Encoding Note:
- * The image URL uploaded to ThingSpeak must be URL-encoded (e.g., & → %26, = → %3D) to avoid truncation or errors, especially on mobile hotspots or restrictive networks.
- *
  * -----------------------------------------------------------------------------
  * Troubleshooting:
  * - If WiFi does not connect, check credentials and signal strength.
@@ -63,27 +58,13 @@
  * - For custom libraries (camera_api.h, google_drive.h), see project documentation for installation and usage.
  */
 
-// Revisions
-// February 27, 2026 -
-// Revise the code structure to make it more modular and easier to read, especially in the main loop.
-// 1. Encapsulated the image capture and Google Drive upload logic into a new function imageCaptureGoogleDriveUploadAndGetUrl() that 
-//    handles both the camera capture and the Google Drive upload steps, and returns the URL of the uploaded image if successful, or an empty string if it fails. 
-//    This makes the main loop cleaner and allows for better error handling when the image upload fails. 
-// 2. Updated the ThingSpeak upload logic to use a single function thingspeakChannelsUpdateWithUrl() that takes both the moisture value and the image URL as parameters,
-//    and uploads them together in a single HTTP request using ThingSpeak.setField() for both fields. 
-//    That is to synchronize the moisture value and the image URL in the same upload, instead of making a separate HTTP request to update the URL after uploading the moisture value.
-//    This is more efficient than making separate requests for the moisture value and the image URL, and ensures that the data is uploaded together consistently.
-// 3. Removed the files thingspeak_url.cpp and thingspeak_url.h since the URL upload is now integrated into the main ThingSpeak upload function, 
-//    simplifying the codebase and reducing the number of files to manage.
-// 
-
 // --- Libraries ---
 #include <WiFi.h>
 #include "ThingSpeak.h"
 #include "camera_api.h"
 #include "app_httpd.h"
 #include "google_drive.h"
-#include "LGFX_ESP32_ST7789.hpp"
+#include "LGFX_ESP32_ST7789.hpp"  //new
 
 // --- Hardware Pin Definitions ---
 #define SENSOR_PIN        1     //ESP32-S3 GPIO 1 (ADC1_CH0) for the moisture sensor
