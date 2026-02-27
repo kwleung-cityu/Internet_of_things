@@ -1,14 +1,15 @@
 /**
- * 11_WaterPumpControl_and_ImageUpload.ino
+ * 12_WaterPumpControl_and_ImageUpload_and_LCD.ino
  *
- * Demo sketch for ESP32-based smart irrigation system, moisture sensor, water pump relay, camera, and cloud upload.
+ * Demo sketch for ESP32-based smart irrigation system with integrated LCD display (LovyanGFX/ST7789), moisture sensor, water pump relay, camera, and cloud upload.
  *
  * High-Level Flow:
  * 1. Periodically read soil moisture sensor.
- * 2. Capture image, upload to Google Drive, and get URL.
- * 3. Upload both moisture value and image URL to ThingSpeak in a single request.
- * 4. Control water pump using hysteresis and soak cycle.
- * 5. Blink LEDs to indicate WiFi status.
+ * 2. Update LCD with latest moisture value.
+ * 3. Capture image, upload to Google Drive, and get URL.
+ * 4. Upload both moisture value and image URL to ThingSpeak in a single request.
+ * 5. Control water pump using hysteresis and soak cycle.
+ * 6. Blink LEDs to indicate WiFi status.
  *
  * How to use:
  * 1. Set up hardware according to pin definitions in Hardware section below.
@@ -18,6 +19,7 @@
  *
  * Hardware:
  * - Freenove ESP32-S3-WROOM development board, N8R8 version
+ * - ST7789 LCD 1.47" IPS 172x320 (LovyanGFX driver)
  * - Moisture sensor (analog)
  * - Water pump relay
  * - Camera module OV2640 compatible
@@ -27,17 +29,24 @@
  *    - Water pump relay: GPIO 47
  *    - Red LED: GPIO 41
  *    - Blue LED: GPIO 42
+ *    - LCD SPI pins defined in LGFX_ESP32_ST7789.hpp (SCLK=GPIO 46, MOSI=GPIO 3, DC=GPIO 2, CS=GPIO 14, RST=GPIO 48)
  *
  * Libraries & Dependencies:
+ * - LovyanGFX (LCD) — install via Arduino Library Manager
  * - ThingSpeak (cloud upload) — install via Arduino Library Manager
  * - ArduinoJson, base64, and custom camera_api.h, google_drive.h, app_httpd.h (see repo or project docs)
  *
+ * LCD Integration:
+ * - Uses LGFX_ESP32_ST7789.hpp and LGFX_ESP32_ST7789.cpp for display control
+ * - Library: LovyanGFX (https://github.com/lovyan03/LovyanGFX)
+ * - lcdMoistureUpdate() updates moisture value on LCD
+ *
  * Author: John Leung
- * Date: Feb 27 2026
+ * Date: February 26, 2026
  *
  * -----------------------------------------------------------------------------
  * Main Loop Tasks:
- * 1. Periodically read moisture sensor, capture/upload image, and update ThingSpeak.
+ * 1. Periodically read moisture sensor, update LCD, capture/upload image, and update ThingSpeak.
  * 2. Manage water pump state machine.
  * 3. Blink LED for WiFi status.
  *
@@ -50,8 +59,23 @@
  * - If WiFi does not connect, check credentials and signal strength.
  * - If ThingSpeak field is empty or truncated, ensure URL encoding is applied and field length is sufficient.
  * - If Google Drive image is not viewable, check sharing permissions (must be public or anyone with link).
+ * - If LCD does not display, check wiring and LovyanGFX configuration.
  * - For custom libraries (camera_api.h, google_drive.h), see project documentation for installation and usage.
  */
+
+// Revisions
+// February 27, 2026 -
+// Revise the code structure to make it more modular and easier to read, especially in the main loop.
+// 1. Encapsulated the image capture and Google Drive upload logic into a new function imageCaptureGoogleDriveUploadAndGetUrl() that 
+//    handles both the camera capture and the Google Drive upload steps, and returns the URL of the uploaded image if successful, or an empty string if it fails. 
+//    This makes the main loop cleaner and allows for better error handling when the image upload fails. 
+// 2. Updated the ThingSpeak upload logic to use a single function thingspeakChannelsUpdateWithUrl() that takes both the moisture value and the image URL as parameters,
+//    and uploads them together in a single HTTP request using ThingSpeak.setField() for both fields. 
+//    That is to synchronize the moisture value and the image URL in the same upload, instead of making a separate HTTP request to update the URL after uploading the moisture value.
+//    This is more efficient than making separate requests for the moisture value and the image URL, and ensures that the data is uploaded together consistently.
+// 3. Removed the files thingspeak_url.cpp and thingspeak_url.h since the URL upload is now integrated into the main ThingSpeak upload function, 
+//    simplifying the codebase and reducing the number of files to manage.
+// 
 
 // --- Libraries ---
 #include <WiFi.h>
@@ -59,6 +83,7 @@
 #include "camera_api.h"
 #include "app_httpd.h"
 #include "google_drive.h"
+#include "LGFX_ESP32_ST7789.hpp"
 
 // --- Hardware Pin Definitions ---
 #define SENSOR_PIN        1     //ESP32-S3 GPIO 1 (ADC1_CH0) for the moisture sensor
@@ -82,6 +107,7 @@ const char *writeApiKey = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your 
 const unsigned int moistureFieldNumber = 1;          // Field number for moisture data
 
 const uint8_t urlFieldNumber = 2; // Field number to upload the URL to
+
 // Replace with your Google Apps Script Web App URL
 const String webAppUrl = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; 
 
@@ -112,6 +138,7 @@ void ledBlinky();
 String imageCaptureGoogleDriveUploadAndGetUrl();
 void startWaterPumpCycle();
 void manageWaterPumpCycle(unsigned int onTime, unsigned int soakTime);
+void lcdMoistureUpdate(uint8_t moistureValue);
 
 // --- Add these new global variables ---
 enum PumpState { IDLE, WATERING, SOAKING };
@@ -145,6 +172,12 @@ void setup() {
     return;
   }
 
+  // --- new code to initialize the LCD and show a startup screen ---
+  lcdInit();
+  spriteDrawBackground();
+  spriteSetFont(&fonts::DejaVu24);
+  spritePrintf(10, 40, 0xFFFF00, "System initializing...");
+
   connectWiFi();
   delay(500); //a short delay to allow WiFi connection
   if (WiFi.status() != WL_CONNECTED) {
@@ -168,7 +201,7 @@ void setup() {
 // ==============================================================================
 void loop() {
   // Main loop tasks:
-  // 1. Periodically read moisture sensor, capture/upload image, and update ThingSpeak.
+  // 1. Periodically read moisture sensor, update LCD, capture/upload image, and update ThingSpeak.
   // 2. Manage water pump state machine.
   // 3. Blink LED for WiFi status.
 
@@ -180,6 +213,7 @@ void loop() {
   if (currentMillis - previousSensorReadMillis >= sensorReadInterval) {
     previousSensorReadMillis = currentMillis;
     moistureValue = readMoisture();
+    lcdMoistureUpdate(moistureValue);
     if (WiFi.status() != WL_CONNECTED) {
       connectWiFi();
     }
@@ -353,4 +387,18 @@ String imageCaptureGoogleDriveUploadAndGetUrl() {
       Serial.println("Camera capture failed.");
       return ""; // Return empty string on failure
     }
+}
+
+/**
+ * @brief Updates the soil moisture value displayed on the LCD. This function takes the moisture value as a parameter, 
+ * allowing it to be called with any moisture value without relying on a global variable. 
+ * The LCD will show the text "Moisture:" followed by the percentage value of the soil moisture.
+ * @param moistureValue The soil moisture percentage to display on the LCD (0-100%
+ */
+void lcdMoistureUpdate(uint8_t moistureValue) {
+  spriteDrawBackground(); // Redraw background to clear previous text
+  spriteSetFont(&fonts::DejaVu24);
+  spritePrintf(40, 40, 0xFFFF00U, "Moisture:"); 
+  spriteSetFont(&fonts::DejaVu40);
+  spritePrintf(40, 80, 0xFFFF00U, "%d%%", moistureValue);
 }

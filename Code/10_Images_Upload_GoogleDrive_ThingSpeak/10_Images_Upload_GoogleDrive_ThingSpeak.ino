@@ -1,10 +1,22 @@
+// This code captures images using an ESP32 camera, uploads them to Google Drive, and then sends the image URL to ThingSpeak.
+// It also includes a button to trigger the image capture and allows setting the image quality via serial input.
+// The code is structured to be modular and easy to read, with clear separation of tasks in the main loop 
+// and functions for specific operations like image capture, Google Drive upload, and ThingSpeak updates.
+
+// Revision history:
+// - Initial version: Feb 3, 2026
+// - Update on Feb 27, 2026:
+// 1. Added a local function urlEncode() to convert special characters in the Google Drive URL into their percent-encoded forms (e.g., < becomes %3C, > becomes %3E, & becomes %26, = becomes %3D, etc.) to ensure the URL can be safely transmitted and used in HTTP requests when uploading to ThingSpeak or other platforms.
+// 2. Added URL encoding to the response URL in uploadToGoogleDrive() to ensure special characters are properly handled when transmitting the URL to ThingSpeak or other platforms.
+// 3. Removed thingspeak_url.cpp and thingspeak_url.h as they are no longer needed with the new URL encoding implementation in google_drive.cpp.
+// 4. Add #include "ThingSpeak.h" to the main .ino file to ensure ThingSpeak functions are available for uploading the URL to ThingSpeak after getting the response from Google Drive.
+// 5. Add `myChannelID` and `urlFieldNumber` constants to specify the ThingSpeak channel and field number for uploading the URL, and use `ThingSpeak.writeField()` to upload the URL to ThingSpeak after a successful upload to Google Drive.
 
 #include <WiFi.h>
+#include "ThingSpeak.h"
 #include "camera_api.h"
 #include "app_httpd.h"
-
 #include "google_drive.h"
-#include "thingspeak_url.h"
 
 #define BUTTON_PIN  0
 // A simple state machine for button press handling
@@ -16,13 +28,23 @@ byte button_state = BUTTON_UP;
 // ==================================
 //    Enter your WiFi credentials
 // ==================================
-const char* ssid     = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid   = "YOUR_WIFI_SSID";
+const char* pass 	 = "YOUR_WIFI_PASSWORD";
+
+const unsigned long myChannelID = 1234567;        // Your ThingSpeak channel number
 const char* writeApiKey  = "YOUR_THINGSPEAK_API_WRITE_KEY"; // Replace with your ThingSpeak API key
-const uint8_t thingSpeakFieldNumber = 2; // Field number to upload the URL to
+const uint8_t urlFieldNumber = 2; // Field number to upload the URL to
 // Replace with your Google Apps Script Web App URL
 const String webAppUrl = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; 
 
+WiFiClient thingspeakClient; // Create a WiFi client for ThingSpeak
+framesize_t size;
+byte quality;
+bool camera_shutter_trigger;
+
+// ==============================================================================
+// SETUP: Runs once at startup
+// ==============================================================================
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
@@ -44,7 +66,7 @@ void setup() {
     return;
   }
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, pass);
   WiFi.setSleep(false);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -62,11 +84,9 @@ void setup() {
 
   Serial.println("Press IO0 button on ESP32-S3 to capture an image, or");
   Serial.println("Select the image quality from 0-17 and quality from 4-63 (e.g. '10 10'):");
-}
 
-framesize_t size;
-byte quality;
-bool camera_shutter_trigger;
+  ThingSpeak.begin(thingspeakClient); // Initialize ThingSpeak client
+}
 
 void loop() {
 
@@ -132,16 +152,22 @@ void loop() {
         }
         #endif
 
-		    String driveResponse;
-        if (uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse)) {
-            Serial.println("Upload successful!");
-            Serial.println("Google Drive response: " + driveResponse);
-            uploadUrlToThingSpeak(driveResponse, String(writeApiKey), thingSpeakFieldNumber);
-        } else {
-            Serial.println("Upload failed!");
-        }
-        
+        String driveResponse;
+        bool uploadSuccess = uploadToGoogleDrive(webAppUrl, fb->buf, fb->len, driveResponse);
         cameraFrameBufferTrash(fb);
+        if (uploadSuccess) {
+          Serial.println("Image uploaded to Google Drive successfully. URL: " + driveResponse);
+          // Upload the URL to ThingSpeak
+          ThingSpeak.setField(urlFieldNumber, driveResponse);
+          int httpCode = ThingSpeak.writeField(myChannelID, urlFieldNumber, driveResponse, writeApiKey);
+          if (httpCode == 200) {
+            Serial.println("Image URL uploaded to ThingSpeak successfully.");
+          } else {
+            Serial.println("Failed to upload image URL to ThingSpeak. Response code: " + String(httpCode));
+          }
+        } else {
+          Serial.println("Upload to Google Drive failed!");
+        }
     } else {
         Serial.println("Camera capture failed.");
     }
