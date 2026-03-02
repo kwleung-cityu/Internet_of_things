@@ -38,7 +38,7 @@ static String urlEncode(const String& str) {
  * @param imageSize The size of the image data in bytes.
  * @param response  A reference to a String variable where the function will store the URL of the uploaded image if the upload is successful.
  *                  Special characters in the URL will be URL-encoded (e.g., < becomes %3C, > becomes %3E, & becomes %26, = becomes %3D, etc.) to ensure it can be safely transmitted and used in HTTP requests.
- *                  The URL will be in the format "https://drive.google.com/uc?export=view&id=FILE_ID" which can be directly used to display the image in ThingSpeak or other platforms.
+ *                  The URL will be in the format "https%3A%2F%2Fdrive%2Egoogle%2Ecom%2Fuc%3Fexport%3Dview%26id..." which can be directly used in ThingSpeak to display the image.
  * @return Returns true if the upload was successful and the URL was retrieved, false otherwise.
  */
 bool uploadToGoogleDrive(const String& webAppUrl, uint8_t* imageData, size_t imageSize, String& response) {
